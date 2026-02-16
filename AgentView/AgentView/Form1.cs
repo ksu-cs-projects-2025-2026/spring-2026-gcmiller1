@@ -137,6 +137,7 @@ namespace AgentView
                 return;
             }
 
+            // Send message to server to redirect caller to DTMF
             var ctrlMsg = new
             {
                 Action = "redirectDTMF",

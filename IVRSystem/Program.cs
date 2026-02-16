@@ -9,9 +9,12 @@ using Twilio;
 using Twilio.Rest.Api.V2010.Account;
 using Twilio.Types;
 
+#region
 string accountSid = "AC2bdf7af1ea3600cd900ddffde05b0875"; // don't do this
 string authToken = "9c1e68efff8e9a5e612d3aa5a99b5325"; // don't do this either
 TwilioClient.Init(accountSid, authToken);
+
+#endregion
 
 var builder = WebApplication.CreateBuilder(args);
 builder.Services.Configure<ForwardedHeadersOptions>(options =>
@@ -36,13 +39,14 @@ app.MapGet("/", () => "Hello World.");
 app.MapPost("/dtmf", (HttpRequest request) =>
 {
     var response = new VoiceResponse();
+    // What information to gather from the user DTMF inputs
     var gather = new Gather(
         numDigits: 1,
         action: new Uri("/gather", UriKind.Relative),
         method: "POST"
     );
     gather.Say("Enter a number on your keypad.");
-    response.Append(gather);
+    response.Append(gather); 
     response.Hangup();
     return Results.Text(response.ToString(), "text/xml", Encoding.UTF8);
 });
@@ -173,7 +177,7 @@ app.MapGet("/stream", async (HttpContext context) =>
 app.MapPost("/gather", async (HttpRequest request) =>
 {
     var form = await request.ReadFormAsync();
-    var digit = form["Digits"].ToString();
+    var digit = form["Digits"].ToString(); // Digits entered to string
     Console.WriteLine($"DTMF received: {digit}");
 
     var response = new VoiceResponse();
