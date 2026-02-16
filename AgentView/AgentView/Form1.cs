@@ -97,6 +97,7 @@ namespace AgentView
                             var muLawBytes = Convert.FromBase64String(messageText);
                             var pcmBuffer = new byte[muLawBytes.Length * 2];
 
+                            // Converts u-law-encoded audio bytes to 16-bit PCM audio
                             for (int i = 0; i < muLawBytes.Length; i++)
                             {
                                 short pcm = MuLawDecoder.MuLawToLinearSample(muLawBytes[i]);
@@ -146,6 +147,7 @@ namespace AgentView
                 return;
             }
 
+            // Send message to server to redirect caller to DTMF
             var ctrlMsg = new
             {
                 Action = "redirectDTMF",
