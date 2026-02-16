@@ -1,3 +1,6 @@
+using System.Net.WebSockets;
+using NAudio.Wave;
+
 namespace AgentView
 {
     internal static class Program
