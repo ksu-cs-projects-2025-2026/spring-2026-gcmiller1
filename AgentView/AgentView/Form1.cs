@@ -69,47 +69,38 @@ namespace AgentView
                 while (ws.State == WebSocketState.Open) // while websocket connection is live
                 {
                     var result = await ws.ReceiveAsync(new ArraySegment<byte>(buffer), CancellationToken.None); // Receive data from server
-
                     if (result.MessageType == WebSocketMessageType.Close) break; // If websocket message closes connection
 
-                    string messageText = Encoding.UTF8.GetString(buffer, 0, result.Count); // Encodes received message
-                    bool handled = false; // Checks if message has been handled yet
+                    // If message received is Text, parse as json
+                    if (result.MessageType == WebSocketMessageType.Text)
+                    {
+                        var json = Encoding.UTF8.GetString(buffer, 0, result.Count);
 
-                    // parse JSON for control messages
-                        using var doc = JsonDocument.Parse(messageText);
+                        using var doc = JsonDocument.Parse(json);
 
                         if (doc.RootElement.TryGetProperty("Event", out var evtProp))
                         {
-                            var evt = evtProp.GetString();
-                            if (evt == "callStarted")
+                            if (evtProp.GetString() == "callStarted")
                             {
                                 currentCallSid = doc.RootElement.GetProperty("CallSid").GetString();
-                                Console.WriteLine($"Current CallSid: {currentCallSid}");
-                                handled = true;
+                                Console.WriteLine($"Call started: {currentCallSid}");
                             }
                         }
-
-                    if (!handled)
+                    }
+                    // If the message type received is Binary, it is audio and should be decoded as such
+                    else if (result.MessageType == WebSocketMessageType.Binary)
                     {
-                        // Decode Twilio audio (base64 mu-law)
-                        try
-                        {
-                            var muLawBytes = Convert.FromBase64String(messageText);
-                            var pcmBuffer = new byte[muLawBytes.Length * 2];
+                        var muLawBytes = buffer.Take(result.Count).ToArray();
+                        var pcmBuffer = new byte[muLawBytes.Length * 2];
 
-                            for (int i = 0; i < muLawBytes.Length; i++)
-                            {
-                                short pcm = MuLawDecoder.MuLawToLinearSample(muLawBytes[i]);
-                                pcmBuffer[i * 2] = (byte)(pcm & 0xff);
-                                pcmBuffer[i * 2 + 1] = (byte)((pcm >> 8) & 0xff);
-                            }
-
-                            bufferProvider.AddSamples(pcmBuffer, 0, pcmBuffer.Length);
-                        }
-                        catch (Exception ex)
+                        for (int i = 0; i < muLawBytes.Length; i++)
                         {
-                            Console.WriteLine($"Error decoding audio: {ex.Message}");
+                            short pcm = MuLawDecoder.MuLawToLinearSample(muLawBytes[i]);
+                            pcmBuffer[i * 2] = (byte)(pcm & 0xff);
+                            pcmBuffer[i * 2 + 1] = (byte)((pcm >> 8) & 0xff);
                         }
+
+                        bufferProvider.AddSamples(pcmBuffer, 0, pcmBuffer.Length);
                     }
                 }
             });

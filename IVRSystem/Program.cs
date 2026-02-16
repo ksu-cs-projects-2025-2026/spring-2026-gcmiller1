@@ -121,13 +121,13 @@ app.MapGet("/stream", async (HttpContext context) =>
                     // Only process inbound audio from caller
                     if (track == "inbound")
                     {
-                        var audioBytes = Encoding.UTF8.GetBytes(payload);
+                        var audioBytes = Convert.FromBase64String(payload);
 
                         // Forward to all connected WinForm clients
                         foreach (var client in wsClients.Values)
                         {
                             if (client.State == WebSocketState.Open)
-                                await client.SendAsync(audioBytes, WebSocketMessageType.Text, true, CancellationToken.None);
+                                await client.SendAsync(audioBytes, WebSocketMessageType.Binary, true, CancellationToken.None);
                         }
                     }
                 }
