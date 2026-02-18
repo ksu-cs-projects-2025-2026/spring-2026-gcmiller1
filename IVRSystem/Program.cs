@@ -10,8 +10,8 @@ using Twilio.Rest.Api.V2010.Account;
 using Twilio.Types;
 
 #region
-string accountSid = "AC2bdf7af1ea3600cd900ddffde05b0875"; // don't do this
-string authToken = "9c1e68efff8e9a5e612d3aa5a99b5325"; // don't do this either
+string accountSid = Environment.GetEnvironmentVariable("TWILIO_ACCOUNT_SID");
+string authToken = Environment.GetEnvironmentVariable("TWILIO_AUTH_TOKEN");
 TwilioClient.Init(accountSid, authToken);
 
 #endregion
