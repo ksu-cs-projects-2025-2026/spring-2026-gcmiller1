@@ -30,7 +30,7 @@
         {
             lb_Status = new Label();
             comboBox1 = new ComboBox();
-            panel1 = new Panel();
+            PanelIncomingCalls = new Panel();
             btn_Home = new Button();
             btn_History = new Button();
             Btn_SendToDTMF = new Button();
@@ -54,12 +54,13 @@
             comboBox1.Size = new Size(121, 23);
             comboBox1.TabIndex = 1;
             // 
-            // panel1
+            // PanelIncomingCalls
             // 
-            panel1.Location = new Point(161, 67);
-            panel1.Name = "panel1";
-            panel1.Size = new Size(537, 306);
-            panel1.TabIndex = 2;
+            PanelIncomingCalls.BackColor = SystemColors.ControlLightLight;
+            PanelIncomingCalls.Location = new Point(161, 67);
+            PanelIncomingCalls.Name = "PanelIncomingCalls";
+            PanelIncomingCalls.Size = new Size(537, 306);
+            PanelIncomingCalls.TabIndex = 2;
             // 
             // btn_Home
             // 
@@ -99,7 +100,7 @@
             Controls.Add(Btn_SendToDTMF);
             Controls.Add(btn_History);
             Controls.Add(btn_Home);
-            Controls.Add(panel1);
+            Controls.Add(PanelIncomingCalls);
             Controls.Add(comboBox1);
             Controls.Add(lb_Status);
             Name = "Form1";
@@ -112,7 +113,7 @@
 
         private Label lb_Status;
         private ComboBox comboBox1;
-        private Panel panel1;
+        private Panel PanelIncomingCalls;
         private Button btn_Home;
         private Button btn_History;
         private Button Btn_SendToDTMF;

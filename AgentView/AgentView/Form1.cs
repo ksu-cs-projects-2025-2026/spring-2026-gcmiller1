@@ -12,11 +12,12 @@ namespace AgentView
 {
     public partial class Form1 : Form
     {
-        private ClientWebSocket ws;
+        private ClientWebSocket agentws;
         private WaveOutEvent waveOut;
         private BufferedWaveProvider bufferProvider;
         private WaveInEvent waveIn;
         private string currentCallSid;
+        private Dictionary<string, IncomingCallControl> incomingCallRows = new();
 
         public Form1()
         {
@@ -35,14 +36,9 @@ namespace AgentView
         /// <returns></returns>
         private async Task ConnectToIVRServerAsync()
         {
-            ws = new ClientWebSocket();
 
             try
             {
-                await ws.ConnectAsync(
-                    new Uri("wss://uncoquettishly-bilgiest-bronson.ngrok-free.dev/stream"), // media stream from the Twilio call
-                    CancellationToken.None);
-
                 // Setup audio playback
                 waveOut = new WaveOutEvent();
                 bufferProvider = new BufferedWaveProvider(new WaveFormat(8000, 16, 1))
@@ -53,6 +49,14 @@ namespace AgentView
                 waveOut.Init(bufferProvider);
                 waveOut.Play();
 
+                agentws = new ClientWebSocket();
+                await agentws.ConnectAsync(
+                    new Uri("wss://uncoquettishly-bilgiest-bronson.ngrok-free.dev/agent"), // media stream from agent mic to be sent back
+                    CancellationToken.None);
+
+                ReceiveCallerAudio();
+                MicCapture();
+
                 Console.WriteLine("Connected to IVR WebSocket server!");
             }
             catch (Exception ex)
@@ -60,15 +64,18 @@ namespace AgentView
                 Console.WriteLine($"WebSocket connection failed: {ex}");
                 return;
             }
+        }
 
+        private void ReceiveCallerAudio()
+        {
             // Start listening for messages
             _ = Task.Run(async () =>
             {
                 var buffer = new byte[8192]; // Audio buffer
 
-                while (ws.State == WebSocketState.Open) // while websocket connection is live
+                while (agentws.State == WebSocketState.Open) // while websocket connection is live
                 {
-                    var result = await ws.ReceiveAsync(new ArraySegment<byte>(buffer), CancellationToken.None); // Receive data from server
+                    var result = await agentws.ReceiveAsync(new ArraySegment<byte>(buffer), CancellationToken.None); // Receive data from server
                     if (result.MessageType == WebSocketMessageType.Close) break; // If websocket message closes connection
 
                     // If message received is Text, parse as json
@@ -78,12 +85,22 @@ namespace AgentView
 
                         using var doc = JsonDocument.Parse(json);
 
-                        if (doc.RootElement.TryGetProperty("Event", out var evtProp))
+                        if (doc.RootElement.TryGetProperty("event", out var evtProp))
                         {
-                            if (evtProp.GetString() == "callStarted")
+                            if (evtProp.GetString() == "start")
                             {
                                 currentCallSid = doc.RootElement.GetProperty("CallSid").GetString();
                                 Console.WriteLine($"Call started: {currentCallSid}");
+                            }
+                            if (evtProp.GetString() == "IncomingCall")
+                            {
+                                string callSid = doc.RootElement.GetProperty("CallSid").GetString();
+                                string from = doc.RootElement.GetProperty("From").GetString();
+
+                                this.Invoke(() =>
+                                {
+                                    AddIncomingCallUI(callSid, from);
+                                });
                             }
                         }
                     }
@@ -106,6 +123,74 @@ namespace AgentView
             });
         }
 
+        private async Task AcceptCall(string callSid)
+        {
+            currentCallSid = callSid;
+
+            var msg = JsonSerializer.Serialize(
+                new
+                {
+                    Action = "acceptCall",
+                    CallSid = callSid
+                });
+
+            await agentws.SendAsync(Encoding.UTF8.GetBytes(msg), WebSocketMessageType.Text, true, CancellationToken.None);
+            Console.WriteLine($"Accepted call {callSid}");
+        }
+        private void AddIncomingCallUI(string callSid, string fromNumber)
+        {
+            if (incomingCallRows.ContainsKey(callSid)) return;
+            var ctrl = new IncomingCallControl(callSid, fromNumber)
+            {
+                Dock = DockStyle.Top
+            };
+
+            ctrl.Accepted += async (_, __) =>
+            {
+                await AcceptCall(callSid);
+                PanelIncomingCalls.Controls.Remove(ctrl);
+                incomingCallRows.Remove(callSid);
+            };
+
+            PanelIncomingCalls.Controls.Add(ctrl);
+            PanelIncomingCalls.Controls.SetChildIndex(ctrl, 0);
+
+            incomingCallRows[callSid] = ctrl;
+        }
+
+        private void MicCapture()
+        {
+            waveIn = new WaveInEvent
+            {
+                WaveFormat = new WaveFormat(8000, 16, 1)
+            };
+
+            waveIn.DataAvailable += async (s, e) =>
+            {
+                var pcm = new byte[e.BytesRecorded];
+                Array.Copy(e.Buffer, pcm, e.BytesRecorded);
+                var muLaw = new byte[pcm.Length / 2];
+                for (int i = 0; i < muLaw.Length; i++)
+                {
+                    short sample = BitConverter.ToInt16(pcm, i * 2);
+                    muLaw[i] = MuLawEncoder.LinearToMuLawSample(sample);
+                }
+
+                var payload = Convert.ToBase64String(muLaw);
+
+                var msg = JsonSerializer.Serialize(
+                    new
+                    {
+                        payload,
+                        CallSid = currentCallSid
+                    }
+                 );
+                await agentws.SendAsync(Encoding.UTF8.GetBytes(msg), WebSocketMessageType.Text, true, CancellationToken.None);
+
+            };
+            waveIn.StartRecording();
+        }
+
         /// <summary>
         /// When form is closed, close everything
         /// </summary>
@@ -114,7 +199,7 @@ namespace AgentView
         {
             waveIn?.StopRecording();
             waveOut?.Stop();
-            ws?.Dispose();
+            agentws?.Dispose();
             base.OnFormClosing(e);
         }
 
@@ -125,7 +210,7 @@ namespace AgentView
         /// <param name="e"></param>
         private async void Btn_SendToDTMF_Click(object sender, EventArgs e)
         {
-            if (ws == null || ws.State != WebSocketState.Open)
+            if (agentws == null || agentws.State != WebSocketState.Open)
             {
                 MessageBox.Show("WebSocket not connected");
                 return;
@@ -147,7 +232,7 @@ namespace AgentView
             var json = JsonSerializer.Serialize(ctrlMsg);
             var bytes = Encoding.UTF8.GetBytes(json);
 
-            await ws.SendAsync(bytes, WebSocketMessageType.Text, true, CancellationToken.None);
+            await agentws.SendAsync(bytes, WebSocketMessageType.Text, true, CancellationToken.None);
             Console.WriteLine($"Sent redirectDTMF for CallSid {currentCallSid}");
         }
     }

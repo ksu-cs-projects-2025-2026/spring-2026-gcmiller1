@@ -28,6 +28,14 @@ var wsClients = new ConcurrentDictionary<Guid, WebSocket>();
 // Active calls tracked by CallSid
 var activeCalls = new ConcurrentDictionary<string, string>();
 
+// Twilio media streams for each call
+var twilioStreams = new ConcurrentDictionary<string, WebSocket>();
+
+//Websocket connections for each agent
+var agentSockets = new ConcurrentDictionary<Guid, WebSocket>();
+
+var callToStreamSid = new ConcurrentDictionary<string, string>();
+
 var app = builder.Build();
 app.UseForwardedHeaders();
 app.UseWebSockets();
@@ -56,29 +64,35 @@ app.MapPost("/voice", async (HttpRequest req) =>
 {
     var form = await req.ReadFormAsync();
     string callSid = form["CallSid"];
+    string fromNumber = form["From"];
     Console.WriteLine($"New voice call: {callSid}");
 
     // Store callSid so it can be redirected later
     activeCalls[callSid] = callSid;
-    var startMsg = JsonSerializer.Serialize(new
+    var incomingMsg = JsonSerializer.Serialize(new
     {
-        Event = "callStarted",
-        CallSid = callSid
+        @event = "IncomingCall",
+        CallSid = callSid,
+        From = fromNumber
     });
 
-    foreach (var client in wsClients.Values)
+    foreach (var agent in agentSockets.Values)
     {
-        if (client.State == WebSocketState.Open)
-            await client.SendAsync(
-                Encoding.UTF8.GetBytes(startMsg),
+        if (agent.State == WebSocketState.Open)
+        {
+            await agent.SendAsync(
+                Encoding.UTF8.GetBytes(incomingMsg),
                 WebSocketMessageType.Text,
                 true,
                 CancellationToken.None);
+        }
     }
     var response = new VoiceResponse();
     var connect = new Twilio.TwiML.Voice.Connect();
-    connect.Stream(url: $"wss://{req.Host}/stream"); // Connect to audio/WebSocketMessage stream
-    response.Append(connect);
+    response.Say("Please wait while we connect you with an agent.");
+    response.Pause(length: 30);
+    //connect.Stream(url: $"wss://{req.Host}/stream"); // Connect to audio/WebSocketMessage stream
+    //response.Append(connect);
 
     return Results.Text(response.ToString(), "text/xml", Encoding.UTF8);
 });
@@ -94,28 +108,38 @@ app.MapGet("/stream", async (HttpContext context) =>
 
     using var ws = await context.WebSockets.AcceptWebSocketAsync();
     var clientId = Guid.NewGuid();
-    wsClients[clientId] = ws;
+    string callSid = null;
 
     var buffer = new byte[16_384];
     var incomingData = new List<byte>();
-
     while (ws.State == WebSocketState.Open)
     {
         var result = await ws.ReceiveAsync(new ArraySegment<byte>(buffer), CancellationToken.None);
         if (result.MessageType == WebSocketMessageType.Close) break;
-
         incomingData.AddRange(buffer.Take(result.Count));
-
         // Try to parse complete JSON from Twilio
         try
         {
             var jsonText = Encoding.UTF8.GetString(incomingData.ToArray());
             using var doc = JsonDocument.Parse(jsonText);
-
+            string streamSid = null;
             if (doc.RootElement.TryGetProperty("event", out var evtProp))
             {
                 var evt = evtProp.GetString();
-
+                if (evt == "start")
+                {
+                    streamSid = doc.RootElement
+                        .GetProperty("start")
+                        .GetProperty("streamSid")
+                        .GetString();
+                    callSid = doc.RootElement
+                        .GetProperty("start")
+                        .GetProperty("callSid")
+                        .GetString();
+                    twilioStreams[callSid] = ws;
+                    callToStreamSid[callSid] = streamSid;
+                    Console.WriteLine($"Twilio stream started for {callSid}");
+                }
                 if (evt == "media")
                 {
                     var media = doc.RootElement.GetProperty("media");
@@ -128,50 +152,136 @@ app.MapGet("/stream", async (HttpContext context) =>
                         var audioBytes = Convert.FromBase64String(payload);
 
                         // Forward to all connected WinForm clients
-                        foreach (var client in wsClients.Values)
+                        foreach (var agent in agentSockets.Values)
                         {
-                            if (client.State == WebSocketState.Open)
-                                await client.SendAsync(audioBytes, WebSocketMessageType.Binary, true, CancellationToken.None);
+                            if (agent.State == WebSocketState.Open)
+                            {
+                                await agent.SendAsync(
+                                    audioBytes,
+                                    WebSocketMessageType.Binary,
+                                    true,
+                                    CancellationToken.None);
+                            }
                         }
                     }
+                    // Forward to all connected WinForm agents
+
                 }
                 else if (evt == "stop")
                 {
                     Console.WriteLine("Twilio stream stopped");
+                    break;
                 }
+
+            }
+            incomingData.Clear(); // successfully parsed JSON
+
+        }
+        catch
+        {
+            // JSON incomplete, wait for next WebSocket frame
+        }
+    }
+});
+
+app.MapGet("/agent", async (HttpContext context) =>
+{
+    if (!context.WebSockets.IsWebSocketRequest)
+    {
+        context.Response.StatusCode = 400;
+        return;
+    }
+
+    var ws = await context.WebSockets.AcceptWebSocketAsync();
+    var agentId = Guid.NewGuid();
+    agentSockets[agentId] = ws;
+
+
+    // Handle control messages from WinForm (redirectDTMF)
+
+    var buffer = new byte[16_384];
+
+    while (ws.State == WebSocketState.Open)
+    {
+        var result = await ws.ReceiveAsync(buffer, CancellationToken.None);
+        if (result.MessageType == WebSocketMessageType.Close) break;
+
+        // Try to parse complete JSON from Twilio
+        try
+        {
+            var json = Encoding.UTF8.GetString(buffer, 0, result.Count);
+            using var doc = JsonDocument.Parse(json);
+
+            if (doc.RootElement.TryGetProperty("payload", out var payloadProp))
+            {
+                var payload = payloadProp.GetString();
+                var audio = Convert.FromBase64String(payload);
+                var callSid = doc.RootElement.GetProperty("CallSid").GetString();
+                if (twilioStreams.TryGetValue(callSid, out var twiliows) && callToStreamSid.TryGetValue(callSid, out var streamSid))
+                {
+                    var twilioMsg = JsonSerializer.Serialize(
+                        new
+                        {
+                            @event = "media",
+                            streamSid = streamSid,
+                            media = new
+                            {
+                                payload
+                            }
+                        });
+
+                    await twiliows.SendAsync(Encoding.UTF8.GetBytes(twilioMsg), WebSocketMessageType.Text, true, CancellationToken.None);
+                }
+
             }
 
-            incomingData.Clear(); // successfully parsed JSON
+            if (doc.RootElement.TryGetProperty("Action", out var actionProp) && actionProp.GetString() == "redirectDTMF")
+            {
+                var callSid = doc.RootElement.GetProperty("CallSid").GetString();
+                Console.WriteLine($"Redirect request from WinForm for CallSid {callSid}");
+                CallResource.Update(
+                    pathSid: callSid,
+                    url: new Uri($"https://uncoquettishly-bilgiest-bronson.ngrok-free.dev/dtmf"),
+                    method: Twilio.Http.HttpMethod.Post
+                );
+                Console.WriteLine($"Call {callSid} redirected to /dtmf");
+            }
+
+            if (actionProp.GetString() == "acceptCall")
+            {
+                var callSid = doc.RootElement.GetProperty("CallSid").GetString();
+                Console.WriteLine($"agent {agentId} accepted call for CallSid {callSid}");
+                CallResource.Update(
+                    pathSid: callSid,
+                    url: new Uri($"https://uncoquettishly-bilgiest-bronson.ngrok-free.dev/connect"),
+                    method: Twilio.Http.HttpMethod.Post
+                );
+                var startMsg = JsonSerializer.Serialize(
+                    new
+                    {
+                        @event = "start",
+                        CallSid = callSid
+                    });
+                await ws.SendAsync(Encoding.UTF8.GetBytes(startMsg), WebSocketMessageType.Text, true, CancellationToken.None);
+            }
         }
         catch
         {
             // JSON incomplete, wait for next WebSocket frame
         }
 
-        // Handle control messages from WinForm (redirectDTMF)
-        if (result.MessageType == WebSocketMessageType.Text)
-        {
-            var text = Encoding.UTF8.GetString(buffer, 0, result.Count);
-            var ctrlMsg = JsonSerializer.Deserialize<WebSocketMessage>(text);
 
-            if (ctrlMsg?.Action == "redirectDTMF" && !string.IsNullOrEmpty(ctrlMsg.CallSid))
-            {
-                Console.WriteLine($"Redirect request from WinForm for CallSid {ctrlMsg.CallSid}");
-                if (activeCalls.TryGetValue(ctrlMsg.CallSid, out var callSid))
-                {
-                    CallResource.Update(
-                        pathSid: callSid,
-                        url: new Uri($"https://uncoquettishly-bilgiest-bronson.ngrok-free.dev/dtmf"),
-                        method: Twilio.Http.HttpMethod.Post
-                    );
-                    Console.WriteLine($"Call {callSid} redirected to /dtmf");
-                }
-            }
-        }
     }
-
-    wsClients.TryRemove(clientId, out _);
 });
+
+app.MapPost("/connect", (HttpRequest req) =>
+    {
+        var response = new VoiceResponse();
+        var connect = new Connect();
+        connect.Stream(url: $"wss://{req.Host}/stream");
+        response.Append(connect);
+        return Results.Text(response.ToString(), "text/xml", Encoding.UTF8);
+    });
 
 // Gather DTMF input from caller
 app.MapPost("/gather", async (HttpRequest request) =>
