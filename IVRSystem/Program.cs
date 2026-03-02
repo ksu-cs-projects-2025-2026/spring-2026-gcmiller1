@@ -51,6 +51,7 @@ app.MapPost("/dtmf", (HttpRequest request) =>
     var gather = new Gather(
         numDigits: 1,
         action: new Uri("/gather", UriKind.Relative),
+        timeout: 30,
         method: "POST"
     );
     gather.Say("Enter a number on your keypad.");
