@@ -90,8 +90,8 @@ app.MapPost("/voice", async (HttpRequest req) =>
     }
     var response = new VoiceResponse();
     var connect = new Twilio.TwiML.Voice.Connect();
-    response.Say("Please wait while we connect you with an agent.");
-    response.Pause(length: 30);
+    //response.Say("Please wait while we connect you with an agent.");
+    //response.Pause(length: 30);
     //connect.Stream(url: $"wss://{req.Host}/stream"); // Connect to audio/WebSocketMessage stream
     //response.Append(connect);
 

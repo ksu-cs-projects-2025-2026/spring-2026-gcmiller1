@@ -18,16 +18,35 @@ namespace AgentView
         private WaveInEvent waveIn;
         private string currentCallSid;
         private Dictionary<string, IncomingCallControl> incomingCallRows = new();
+        private AgentStatus Status;
 
         public Form1()
         {
             InitializeComponent();
             this.Load += Form1_Load;
+            PopulateStatusDropdown();
+        }
+
+        private void PopulateStatusDropdown()
+        {
+            var statuses = Enum.GetValues(typeof(AgentStatus))
+                .Cast<AgentStatus>()
+                .Where(s => s != AgentStatus.OnCall)
+                .ToList();
+
+            comboBox1.DataSource = statuses;
         }
 
         private async void Form1_Load(object sender, EventArgs e)
         {
             await ConnectToIVRServerAsync();
+        }
+
+        private void SetAgentOnCall()
+        {
+            comboBox1.Enabled = false;
+            comboBox1.Text = AgentStatus.OnCall.ToString();
+            Status = AgentStatus.OnCall;
         }
 
         /// <summary>
@@ -102,6 +121,11 @@ namespace AgentView
                                     AddIncomingCallUI(callSid, from);
                                 });
                             }
+                            if (evtProp.GetString() == "end")
+                            {
+                                currentCallSid = "";
+                                Console.WriteLine("Call ended");
+                            }
                         }
                     }
                     // If the message type received is Binary, it is audio and should be decoded as such
@@ -123,7 +147,7 @@ namespace AgentView
             });
         }
 
-        private async Task AcceptCall(string callSid)
+        private async Task AcceptCall(string callSid, string fromNumber)
         {
             currentCallSid = callSid;
 
@@ -136,7 +160,42 @@ namespace AgentView
 
             await agentws.SendAsync(Encoding.UTF8.GetBytes(msg), WebSocketMessageType.Text, true, CancellationToken.None);
             Console.WriteLine($"Accepted call {callSid}");
+            SetAgentOnCall();
+            var callCtrl = new OnCallControl(callSid, fromNumber)
+            {
+                Dock = DockStyle.Fill
+            };
+            PanelIncomingCalls.Controls.Add(callCtrl);
+
+            callCtrl.CallEnded += async (_, __) =>
+            {
+                await EndCall(callSid);
+                PanelIncomingCalls.Controls.Remove(callCtrl);
+            };
         }
+
+        private async Task EndCall(string callSid)
+        {
+            currentCallSid = callSid;
+
+            var msg = JsonSerializer.Serialize(
+                new
+                {
+                    Action = "endCall",
+                    CallSid = callSid
+                });
+
+            await agentws.SendAsync(Encoding.UTF8.GetBytes(msg), WebSocketMessageType.Text, true, CancellationToken.None);
+            Console.WriteLine($"Ended call {callSid}");
+            SetAgentOffCall();
+        }
+
+        private void SetAgentOffCall()
+        {
+            comboBox1.Enabled = true;
+            comboBox1.SelectedItem = AgentStatus.Available;
+        }
+
         private void AddIncomingCallUI(string callSid, string fromNumber)
         {
             if (incomingCallRows.ContainsKey(callSid)) return;
@@ -145,9 +204,11 @@ namespace AgentView
                 Dock = DockStyle.Top
             };
 
+
+
             ctrl.Accepted += async (_, __) =>
             {
-                await AcceptCall(callSid);
+                await AcceptCall(callSid, fromNumber);
                 PanelIncomingCalls.Controls.Remove(ctrl);
                 incomingCallRows.Remove(callSid);
             };
@@ -234,6 +295,21 @@ namespace AgentView
 
             await agentws.SendAsync(bytes, WebSocketMessageType.Text, true, CancellationToken.None);
             Console.WriteLine($"Sent redirectDTMF for CallSid {currentCallSid}");
+        }
+
+        private void lb_Status_Click(object sender, EventArgs e)
+        {
+
+        }
+
+        private void PanelIncomingCalls_Paint(object sender, PaintEventArgs e)
+        {
+
+        }
+
+        private void comboBox1_SelectedIndexChanged(object sender, EventArgs e)
+        {
+            Status = (AgentStatus)comboBox1.SelectedIndex;
         }
     }
 }

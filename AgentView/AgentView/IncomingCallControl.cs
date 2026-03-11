@@ -7,6 +7,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using System.Windows.Forms;
+using PhoneNumbers;
 
 namespace AgentView
 {
@@ -21,12 +22,19 @@ namespace AgentView
             CallSid = callSid;
             FromNumber = fromNumber;
 
-            label1.Text = $"Incoming Call: {fromNumber}";
+            label1.Text = $"Incoming Call: {FormatPhone(FromNumber)}";
         }
 
+        public static string FormatPhone(string pn)
+        {
+            var phoneUtil = PhoneNumberUtil.GetInstance();
+            var number = phoneUtil.Parse(pn, null);
+            return phoneUtil.Format(number, PhoneNumberFormat.INTERNATIONAL);
+        }
         private void button1_Click(object sender, EventArgs e)
         {
             Accepted?.Invoke(this, EventArgs.Empty);
         }
+
     }
 }

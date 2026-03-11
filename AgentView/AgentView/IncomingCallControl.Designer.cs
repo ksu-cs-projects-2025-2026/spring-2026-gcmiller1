@@ -34,6 +34,7 @@
             // 
             // label1
             // 
+            label1.Anchor = AnchorStyles.Left;
             label1.AutoSize = true;
             label1.Font = new Font("Segoe UI", 12F);
             label1.Location = new Point(12, 11);
@@ -45,11 +46,12 @@
             // button1
             // 
             button1.BackColor = Color.SpringGreen;
+            button1.Dock = DockStyle.Right;
             button1.Font = new Font("Segoe UI", 12F, FontStyle.Bold, GraphicsUnit.Point, 0);
             button1.ForeColor = Color.Azure;
-            button1.Location = new Point(355, 3);
+            button1.Location = new Point(367, 0);
             button1.Name = "button1";
-            button1.Size = new Size(93, 39);
+            button1.Size = new Size(93, 45);
             button1.TabIndex = 1;
             button1.Text = "Accept";
             button1.UseVisualStyleBackColor = false;
@@ -59,6 +61,7 @@
             // 
             AutoScaleDimensions = new SizeF(7F, 15F);
             AutoScaleMode = AutoScaleMode.Font;
+            AutoSize = true;
             Controls.Add(button1);
             Controls.Add(label1);
             Name = "IncomingCallControl";
