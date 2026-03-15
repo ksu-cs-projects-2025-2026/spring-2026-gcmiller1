@@ -19,6 +19,7 @@ namespace AgentView
         private string currentCallSid;
         private Dictionary<string, IncomingCallControl> incomingCallRows = new();
         private AgentStatus Status;
+        private OnCallControl activeCallControl;
 
         public Form1()
         {
@@ -121,10 +122,23 @@ namespace AgentView
                                     AddIncomingCallUI(callSid, from);
                                 });
                             }
-                            if (evtProp.GetString() == "end")
+                            if (evtProp.GetString() == "endCall")
                             {
-                                currentCallSid = "";
-                                Console.WriteLine("Call ended");
+                                var callSid = doc.RootElement.GetProperty("CallSid").GetString();
+                                Console.WriteLine($"Call ended: {callSid}");
+
+                                this.Invoke(() =>
+                                {
+                                    if (activeCallControl != null && activeCallControl.CallSid == callSid)
+                                    {
+                                        PanelIncomingCalls.Controls.Remove(activeCallControl);
+                                        activeCallControl.Dispose();
+                                        activeCallControl = null;
+                                    }
+
+                                    currentCallSid = "";
+                                    SetAgentOffCall();
+                                });
                             }
                         }
                     }
@@ -161,12 +175,13 @@ namespace AgentView
             await agentws.SendAsync(Encoding.UTF8.GetBytes(msg), WebSocketMessageType.Text, true, CancellationToken.None);
             Console.WriteLine($"Accepted call {callSid}");
             SetAgentOnCall();
+
             var callCtrl = new OnCallControl(callSid, fromNumber)
             {
                 Dock = DockStyle.Fill
             };
             PanelIncomingCalls.Controls.Add(callCtrl);
-
+            activeCallControl = callCtrl;
             callCtrl.CallEnded += async (_, __) =>
             {
                 await EndCall(callSid);

@@ -90,10 +90,10 @@ app.MapPost("/voice", async (HttpRequest req) =>
     }
     var response = new VoiceResponse();
     var connect = new Twilio.TwiML.Voice.Connect();
-    //response.Say("Please wait while we connect you with an agent.");
-    //response.Pause(length: 30);
-    //connect.Stream(url: $"wss://{req.Host}/stream"); // Connect to audio/WebSocketMessage stream
-    //response.Append(connect);
+    response.Say("Please wait while we connect you with an agent.");
+    response.Pause(length: 30);
+    connect.Stream(url: $"wss://{req.Host}/stream"); // Connect to audio/WebSocketMessage stream
+    response.Append(connect);
 
     return Results.Text(response.ToString(), "text/xml", Encoding.UTF8);
 });
@@ -171,6 +171,28 @@ app.MapGet("/stream", async (HttpContext context) =>
                 else if (evt == "stop")
                 {
                     Console.WriteLine("Twilio stream stopped");
+                    Console.WriteLine($"Call ended: {callSid}");
+
+                    // cleanup
+                    twilioStreams.TryRemove(callSid, out _);
+                    callToStreamSid.TryRemove(callSid, out _);
+                    activeCalls.TryRemove(callSid, out _);
+
+                    // notify all agents
+                    var endMsg = JsonSerializer.Serialize(new
+                    {
+                        @event = "endCall",
+                        CallSid = callSid
+                    });
+
+                    foreach (var agent in agentSockets.Values)
+                    {
+                        if (agent.State == WebSocketState.Open)
+                        {
+                            await agent.SendAsync(Encoding.UTF8.GetBytes(endMsg), WebSocketMessageType.Text, true, CancellationToken.None);
+                        }
+                    }
+
                     break;
                 }
 
@@ -264,6 +286,23 @@ app.MapGet("/agent", async (HttpContext context) =>
                         CallSid = callSid
                     });
                 await ws.SendAsync(Encoding.UTF8.GetBytes(startMsg), WebSocketMessageType.Text, true, CancellationToken.None);
+            }
+
+            if (actionProp.GetString() == "endCall")
+            {
+                var callSid = doc.RootElement.GetProperty("CallSid").GetString();
+                Console.WriteLine($"Agent requested endCall for {callSid}");
+
+                // Hang up call via Twilio
+                CallResource.Update(
+                    pathSid: callSid,
+                    status: CallResource.UpdateStatusEnum.Completed
+                );
+
+                // cleanup
+                twilioStreams.TryRemove(callSid, out _);
+                callToStreamSid.TryRemove(callSid, out _);
+                activeCalls.TryRemove(callSid, out _);
             }
         }
         catch
