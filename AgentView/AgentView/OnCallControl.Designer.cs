@@ -33,6 +33,7 @@
             label_Timer = new Label();
             label_FromNumber = new Label();
             btn_EndCall = new CircleButton();
+            btn_MuteMic = new CircleButton();
             SuspendLayout();
             // 
             // label_Timer
@@ -73,10 +74,24 @@
             btn_EndCall.UseVisualStyleBackColor = false;
             btn_EndCall.Click += btn_EndCall_Click;
             // 
+            // btn_MuteMic
+            // 
+            btn_MuteMic.BackColor = SystemColors.ButtonHighlight;
+            btn_MuteMic.BackgroundImage = Properties.Resources.microphone_105;
+            btn_MuteMic.BackgroundImageLayout = ImageLayout.Stretch;
+            btn_MuteMic.FlatStyle = FlatStyle.Flat;
+            btn_MuteMic.Location = new Point(328, 268);
+            btn_MuteMic.Name = "btn_MuteMic";
+            btn_MuteMic.Size = new Size(80, 80);
+            btn_MuteMic.TabIndex = 3;
+            btn_MuteMic.UseVisualStyleBackColor = false;
+            btn_MuteMic.Click += btn_MuteMic_Click;
+            // 
             // OnCallControl
             // 
             AutoScaleDimensions = new SizeF(7F, 15F);
             AutoScaleMode = AutoScaleMode.Font;
+            Controls.Add(btn_MuteMic);
             Controls.Add(btn_EndCall);
             Controls.Add(label_Timer);
             Controls.Add(label_FromNumber);
@@ -91,5 +106,6 @@
         private Label label_Timer;
         private Label label_FromNumber;
         private CircleButton btn_EndCall;
+        private CircleButton btn_MuteMic;
     }
 }

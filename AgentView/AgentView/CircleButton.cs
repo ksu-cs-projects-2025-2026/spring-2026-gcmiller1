@@ -23,25 +23,18 @@ namespace AgentView
         protected override void OnPaint(PaintEventArgs e)
         {
             e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
-            base.OnPaint(e);
+
             using (SolidBrush brush = new SolidBrush(BackColor))
             {
                 e.Graphics.FillEllipse(brush, 0, 0, Width, Height);
             }
 
+            base.OnPaint(e);
+
             using (Pen pen = new Pen(Color.Black, 2))
             {
                 e.Graphics.DrawEllipse(pen, 0, 0, Width - 1, Height - 1);
             }
-
-            TextRenderer.DrawText(
-                e.Graphics,
-                Text,
-                Font,
-                ClientRectangle,
-                ForeColor,
-                TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter
-            );
         }
     }
 }

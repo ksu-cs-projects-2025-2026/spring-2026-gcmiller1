@@ -20,6 +20,7 @@ namespace AgentView
         private Dictionary<string, IncomingCallControl> incomingCallRows = new();
         private AgentStatus Status;
         private OnCallControl activeCallControl;
+        private bool micMuted = false;
 
         public Form1()
         {
@@ -180,6 +181,7 @@ namespace AgentView
             {
                 Dock = DockStyle.Fill
             };
+            callCtrl.MuteUnmute += ToggleMicMute;
             PanelIncomingCalls.Controls.Add(callCtrl);
             activeCallControl = callCtrl;
             callCtrl.CallEnded += async (_, __) =>
@@ -243,6 +245,7 @@ namespace AgentView
 
             waveIn.DataAvailable += async (s, e) =>
             {
+                if (micMuted || string.IsNullOrEmpty(currentCallSid)) return;
                 var pcm = new byte[e.BytesRecorded];
                 Array.Copy(e.Buffer, pcm, e.BytesRecorded);
                 var muLaw = new byte[pcm.Length / 2];
@@ -265,6 +268,12 @@ namespace AgentView
 
             };
             waveIn.StartRecording();
+        }
+
+        private void ToggleMicMute(bool mute)
+        {
+            micMuted = mute;
+            if (waveIn == null) return;
         }
 
         /// <summary>

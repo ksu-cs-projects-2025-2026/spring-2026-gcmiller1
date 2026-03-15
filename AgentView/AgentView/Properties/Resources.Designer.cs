@@ -93,6 +93,46 @@ namespace AgentView.Properties {
         /// <summary>
         ///   Looks up a localized resource of type System.Drawing.Bitmap.
         /// </summary>
+        internal static System.Drawing.Bitmap microphone_105 {
+            get {
+                object obj = ResourceManager.GetObject("microphone-105", resourceCulture);
+                return ((System.Drawing.Bitmap)(obj));
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized resource of type System.Drawing.Bitmap.
+        /// </summary>
+        internal static System.Drawing.Bitmap microphone_105_64 {
+            get {
+                object obj = ResourceManager.GetObject("microphone-105-64", resourceCulture);
+                return ((System.Drawing.Bitmap)(obj));
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized resource of type System.Drawing.Bitmap.
+        /// </summary>
+        internal static System.Drawing.Bitmap microphone_mute {
+            get {
+                object obj = ResourceManager.GetObject("microphone-mute", resourceCulture);
+                return ((System.Drawing.Bitmap)(obj));
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized resource of type System.Drawing.Bitmap.
+        /// </summary>
+        internal static System.Drawing.Bitmap unmuted {
+            get {
+                object obj = ResourceManager.GetObject("unmuted", resourceCulture);
+                return ((System.Drawing.Bitmap)(obj));
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized resource of type System.Drawing.Bitmap.
+        /// </summary>
         internal static System.Drawing.Bitmap upscalemedia_transformedtransparent {
             get {
                 object obj = ResourceManager.GetObject("upscalemedia-transformedtransparent", resourceCulture);

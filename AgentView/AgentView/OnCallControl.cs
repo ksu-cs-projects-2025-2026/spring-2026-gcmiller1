@@ -17,10 +17,13 @@ namespace AgentView
         public string FromNumber { get; }
         private Stopwatch stopwatch = new Stopwatch();
         public event EventHandler CallEnded;
+        public event Action<bool> MuteUnmute;
+        private bool IsMuted;
         public OnCallControl(string callSid, string from)
         {
             CallSid = callSid;
             FromNumber = from;
+            IsMuted = false;
             InitializeComponent();
             timer_Call.Interval = 1000;
             timer_Call.Tick += Timer_Call_Tick;
@@ -39,6 +42,27 @@ namespace AgentView
             timer_Call.Stop();
             stopwatch.Stop();
             CallEnded?.Invoke(this, EventArgs.Empty);
+        }
+
+        private void btn_MuteMic_Click(object sender, EventArgs e)
+        {
+            if (IsMuted == false)
+            {
+                btn_MuteMic.BackColor = SystemColors.ButtonHighlight;
+                btn_MuteMic.BackgroundImage = Properties.Resources.microphone_mute;
+                btn_MuteMic.BackgroundImageLayout = ImageLayout.Stretch;
+                MuteUnmute?.Invoke(true);
+                IsMuted = true;
+            }
+            else
+            {
+                btn_MuteMic.BackColor = SystemColors.ButtonHighlight;
+                btn_MuteMic.BackgroundImage = Properties.Resources.microphone_105;
+                btn_MuteMic.BackgroundImageLayout = ImageLayout.Stretch;
+                MuteUnmute?.Invoke(false);
+                IsMuted = false;
+            }
+
         }
     }
 }
