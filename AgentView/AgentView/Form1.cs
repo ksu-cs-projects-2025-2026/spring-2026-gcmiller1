@@ -141,6 +141,21 @@ namespace AgentView
                                     SetAgentOffCall();
                                 });
                             }
+
+                            if (evtProp.GetString() == "callAnswered")
+                            {
+                                var callSid = doc.RootElement.GetProperty("CallSid").GetString();
+
+                                this.Invoke(() =>
+                                {
+                                    if (incomingCallRows.TryGetValue(callSid, out var ctrl))
+                                    {
+                                        PanelIncomingCalls.Controls.Remove(ctrl);
+                                        ctrl.Dispose();
+                                        incomingCallRows.Remove(callSid);
+                                    }
+                                });
+                            }
                         }
                     }
                     // If the message type received is Binary, it is audio and should be decoded as such
@@ -182,6 +197,7 @@ namespace AgentView
                 Dock = DockStyle.Fill
             };
             callCtrl.MuteUnmute += ToggleMicMute;
+            callCtrl.SendToDTMF += async (_, __) => await SendToDTMF();
             PanelIncomingCalls.Controls.Add(callCtrl);
             activeCallControl = callCtrl;
             callCtrl.CallEnded += async (_, __) =>
@@ -276,24 +292,7 @@ namespace AgentView
             if (waveIn == null) return;
         }
 
-        /// <summary>
-        /// When form is closed, close everything
-        /// </summary>
-        /// <param name="e"></param>
-        protected override void OnFormClosing(FormClosingEventArgs e)
-        {
-            waveIn?.StopRecording();
-            waveOut?.Stop();
-            agentws?.Dispose();
-            base.OnFormClosing(e);
-        }
-
-        /// <summary>
-        /// When SendToDTMF button is clicked, send message to server to redirect that call to the DTMF line
-        /// </summary>
-        /// <param name="sender"></param>
-        /// <param name="e"></param>
-        private async void Btn_SendToDTMF_Click(object sender, EventArgs e)
+        private async Task SendToDTMF()
         {
             if (agentws == null || agentws.State != WebSocketState.Open)
             {
@@ -321,6 +320,51 @@ namespace AgentView
             Console.WriteLine($"Sent redirectDTMF for CallSid {currentCallSid}");
         }
 
+        /// <summary>
+        /// When form is closed, close everything
+        /// </summary>
+        /// <param name="e"></param>
+        protected override void OnFormClosing(FormClosingEventArgs e)
+        {
+            waveIn?.StopRecording();
+            waveOut?.Stop();
+            agentws?.Dispose();
+            base.OnFormClosing(e);
+        }
+
+        /// <summary>
+        /// When SendToDTMF button is clicked, send message to server to redirect that call to the DTMF line
+        /// </summary>
+        /// <param name="sender"></param>
+        /// <param name="e"></param>
+        /*private async void Btn_SendToDTMF_Click(object sender, EventArgs e)
+        {
+            if (agentws == null || agentws.State != WebSocketState.Open)
+            {
+                MessageBox.Show("WebSocket not connected");
+                return;
+            }
+
+            if (string.IsNullOrEmpty(currentCallSid))
+            {
+                MessageBox.Show("No CallSid available");
+                return;
+            }
+
+            // Send message to server to redirect caller to DTMF
+            var ctrlMsg = new
+            {
+                Action = "redirectDTMF",
+                CallSid = currentCallSid
+            };
+
+            var json = JsonSerializer.Serialize(ctrlMsg);
+            var bytes = Encoding.UTF8.GetBytes(json);
+
+            await agentws.SendAsync(bytes, WebSocketMessageType.Text, true, CancellationToken.None);
+            Console.WriteLine($"Sent redirectDTMF for CallSid {currentCallSid}");
+        }*/
+
         private void lb_Status_Click(object sender, EventArgs e)
         {
 
@@ -333,7 +377,7 @@ namespace AgentView
 
         private void comboBox1_SelectedIndexChanged(object sender, EventArgs e)
         {
-            Status = (AgentStatus)comboBox1.SelectedIndex;
+            Status = (AgentStatus)comboBox1.SelectedItem;
         }
     }
 }

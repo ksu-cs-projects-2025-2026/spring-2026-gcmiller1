@@ -18,6 +18,7 @@ namespace AgentView
         private Stopwatch stopwatch = new Stopwatch();
         public event EventHandler CallEnded;
         public event Action<bool> MuteUnmute;
+        public event EventHandler SendToDTMF;
         private bool IsMuted;
         public OnCallControl(string callSid, string from)
         {
@@ -63,6 +64,11 @@ namespace AgentView
                 IsMuted = false;
             }
 
+        }
+
+        private void btn_DTMF_Click(object sender, EventArgs e)
+        {
+            SendToDTMF?.Invoke(this, EventArgs.Empty);
         }
     }
 }

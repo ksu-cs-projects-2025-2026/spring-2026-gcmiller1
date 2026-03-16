@@ -33,7 +33,6 @@
             PanelIncomingCalls = new Panel();
             btn_Home = new Button();
             btn_History = new Button();
-            Btn_SendToDTMF = new Button();
             panel_Menu = new Panel();
             panel_Top = new Panel();
             panel_Logo = new Panel();
@@ -117,22 +116,11 @@
             btn_History.TextImageRelation = TextImageRelation.ImageBeforeText;
             btn_History.UseVisualStyleBackColor = true;
             // 
-            // Btn_SendToDTMF
-            // 
-            Btn_SendToDTMF.Location = new Point(35, 416);
-            Btn_SendToDTMF.Name = "Btn_SendToDTMF";
-            Btn_SendToDTMF.Size = new Size(75, 23);
-            Btn_SendToDTMF.TabIndex = 5;
-            Btn_SendToDTMF.Text = "DTMF";
-            Btn_SendToDTMF.UseVisualStyleBackColor = true;
-            Btn_SendToDTMF.Click += Btn_SendToDTMF_Click;
-            // 
             // panel_Menu
             // 
             panel_Menu.BackColor = SystemColors.ControlLightLight;
             panel_Menu.Controls.Add(btn_History);
             panel_Menu.Controls.Add(btn_Home);
-            panel_Menu.Controls.Add(Btn_SendToDTMF);
             panel_Menu.Dock = DockStyle.Left;
             panel_Menu.Location = new Point(0, 32);
             panel_Menu.Name = "panel_Menu";
@@ -209,7 +197,6 @@
         private Panel PanelIncomingCalls;
         private Button btn_Home;
         private Button btn_History;
-        private Button Btn_SendToDTMF;
         private Panel panel_Menu;
         private Panel panel_Top;
         private Panel panel_Logo;

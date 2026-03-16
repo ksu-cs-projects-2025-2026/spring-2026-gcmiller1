@@ -49,14 +49,16 @@ app.MapPost("/dtmf", (HttpRequest request) =>
     var response = new VoiceResponse();
     // What information to gather from the user DTMF inputs
     var gather = new Gather(
-        numDigits: 1,
+        numDigits: 20,
         action: new Uri("/gather", UriKind.Relative),
-        timeout: 30,
+        timeout: 120,
+        finishOnKey: "#",
         method: "POST"
     );
-    gather.Say("Enter a number on your keypad.");
-    response.Append(gather); 
-    response.Hangup();
+    gather.Say("Enter payment number on your keypad.");
+    response.Append(gather);
+    response.Say("We did not receive your input. Please try again.");
+    response.Redirect(new Uri("/dtmf", UriKind.Relative));
     return Results.Text(response.ToString(), "text/xml", Encoding.UTF8);
 });
 
@@ -90,7 +92,7 @@ app.MapPost("/voice", async (HttpRequest req) =>
     }
     var response = new VoiceResponse();
     var connect = new Twilio.TwiML.Voice.Connect();
-    response.Say("Please wait while we connect you with an agent.");
+    response.Say("Please wait to be connected to an agent.");
     response.Pause(length: 30);
     connect.Stream(url: $"wss://{req.Host}/stream"); // Connect to audio/WebSocketMessage stream
     response.Append(connect);
@@ -178,8 +180,7 @@ app.MapGet("/stream", async (HttpContext context) =>
                     callToStreamSid.TryRemove(callSid, out _);
                     activeCalls.TryRemove(callSid, out _);
 
-                    // notify all agents
-                    var endMsg = JsonSerializer.Serialize(new
+                    /*var endMsg = JsonSerializer.Serialize(new
                     {
                         @event = "endCall",
                         CallSid = callSid
@@ -192,7 +193,7 @@ app.MapGet("/stream", async (HttpContext context) =>
                             await agent.SendAsync(Encoding.UTF8.GetBytes(endMsg), WebSocketMessageType.Text, true, CancellationToken.None);
                         }
                     }
-
+                    */
                     break;
                 }
 
@@ -286,6 +287,20 @@ app.MapGet("/agent", async (HttpContext context) =>
                         CallSid = callSid
                     });
                 await ws.SendAsync(Encoding.UTF8.GetBytes(startMsg), WebSocketMessageType.Text, true, CancellationToken.None);
+                var answeredMsg = JsonSerializer.Serialize(new
+                {
+                    @event = "callAnswered",
+                    CallSid = callSid
+                });
+
+                // Notify all other agents that the call has been answered
+                foreach (var agent in agentSockets)
+                {
+                    if (agent.Key != agentId && agent.Value.State == WebSocketState.Open)
+                    {
+                        await agent.Value.SendAsync(Encoding.UTF8.GetBytes(answeredMsg), WebSocketMessageType.Text, true, CancellationToken.None);
+                    }
+                }
             }
 
             if (actionProp.GetString() == "endCall")
@@ -327,14 +342,51 @@ app.MapPost("/connect", (HttpRequest req) =>
 app.MapPost("/gather", async (HttpRequest request) =>
 {
     var form = await request.ReadFormAsync();
-    var digit = form["Digits"].ToString(); // Digits entered to string
-    Console.WriteLine($"DTMF received: {digit}");
+    var digits = form["Digits"].ToString(); // Digits entered to string
 
     var response = new VoiceResponse();
-    response.Say($"You pressed {digit}");
-    response.Hangup();
+
+    if (digits.Length < 13 || digits.Length > 19)
+    {
+        response.Say("Invalid card number. Try again.");
+        response.Redirect(new Uri("/dtmf", UriKind.Relative));
+        return Results.Text(response.ToString(), "text/xml", Encoding.UTF8);
+    }
+
+    if (LuhnCheck(digits))
+    {
+        response.Say("Your card number was successfully validated.");
+        response.Redirect(new Uri("https://uncoquettishly-bilgiest-bronson.ngrok-free.dev/connect"), Twilio.Http.HttpMethod.Post);
+    }
+    else
+    {
+        response.Say("Invalid card number. Please try again.");
+        response.Redirect(new Uri("/dtmf", UriKind.Relative));
+    }
     return Results.Text(response.ToString(), "text/xml", Encoding.UTF8);
 });
+
+ static bool LuhnCheck(string cardNumber)
+{
+    int sum = 0;
+    bool alt = false;
+    for (int i = cardNumber.Length - 1; i >= 0; i--)
+    {
+        int digit = cardNumber[i] - '0';
+        if (alt)
+        {
+            digit *= 2;
+            if (digit > 9)
+            {
+                digit -= 9;
+            }
+        }
+        sum += digit;
+        alt = !alt;
+    }
+
+    return (sum % 10 == 0);
+}
 
 app.Run();
 
