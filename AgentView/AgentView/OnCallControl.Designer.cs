@@ -29,12 +29,14 @@
         private void InitializeComponent()
         {
             components = new System.ComponentModel.Container();
+            System.ComponentModel.ComponentResourceManager resources = new System.ComponentModel.ComponentResourceManager(typeof(OnCallControl));
             timer_Call = new System.Windows.Forms.Timer(components);
             label_Timer = new Label();
             label_FromNumber = new Label();
             btn_EndCall = new CircleButton();
             btn_MuteMic = new CircleButton();
             btn_DTMF = new CircleButton();
+            btn_Hold = new CircleButton();
             SuspendLayout();
             // 
             // label_Timer
@@ -63,6 +65,8 @@
             // btn_EndCall
             // 
             btn_EndCall.BackColor = Color.DarkRed;
+            btn_EndCall.BackgroundImage = Properties.Resources.telephone_173;
+            btn_EndCall.BackgroundImageLayout = ImageLayout.Zoom;
             btn_EndCall.FlatAppearance.BorderSize = 0;
             btn_EndCall.FlatStyle = FlatStyle.Flat;
             btn_EndCall.Location = new Point(242, 268);
@@ -70,7 +74,6 @@
             btn_EndCall.Padding = new Padding(0, 10, 0, 0);
             btn_EndCall.Size = new Size(80, 80);
             btn_EndCall.TabIndex = 2;
-            btn_EndCall.Text = "End Call";
             btn_EndCall.TextAlign = ContentAlignment.TopCenter;
             btn_EndCall.UseVisualStyleBackColor = false;
             btn_EndCall.Click += btn_EndCall_Click;
@@ -91,7 +94,7 @@
             // btn_DTMF
             // 
             btn_DTMF.BackColor = SystemColors.ButtonShadow;
-            btn_DTMF.BackgroundImage = Properties.Resources.locked;
+            btn_DTMF.BackgroundImage = (Image)resources.GetObject("btn_DTMF.BackgroundImage");
             btn_DTMF.BackgroundImageLayout = ImageLayout.Stretch;
             btn_DTMF.FlatAppearance.BorderSize = 0;
             btn_DTMF.FlatStyle = FlatStyle.Flat;
@@ -102,10 +105,25 @@
             btn_DTMF.UseVisualStyleBackColor = false;
             btn_DTMF.Click += btn_DTMF_Click;
             // 
+            // btn_Hold
+            // 
+            btn_Hold.BackColor = SystemColors.ControlDark;
+            btn_Hold.BackgroundImage = Properties.Resources.pause;
+            btn_Hold.BackgroundImageLayout = ImageLayout.Stretch;
+            btn_Hold.FlatAppearance.BorderSize = 0;
+            btn_Hold.FlatStyle = FlatStyle.Flat;
+            btn_Hold.Location = new Point(242, 182);
+            btn_Hold.Name = "btn_Hold";
+            btn_Hold.Size = new Size(80, 80);
+            btn_Hold.TabIndex = 5;
+            btn_Hold.UseVisualStyleBackColor = false;
+            btn_Hold.Click += btn_Hold_Click;
+            // 
             // OnCallControl
             // 
             AutoScaleDimensions = new SizeF(7F, 15F);
             AutoScaleMode = AutoScaleMode.Font;
+            Controls.Add(btn_Hold);
             Controls.Add(btn_DTMF);
             Controls.Add(btn_MuteMic);
             Controls.Add(btn_EndCall);
@@ -124,5 +142,6 @@
         private CircleButton btn_EndCall;
         private CircleButton btn_MuteMic;
         private CircleButton btn_DTMF;
+        private CircleButton btn_Hold;
     }
 }

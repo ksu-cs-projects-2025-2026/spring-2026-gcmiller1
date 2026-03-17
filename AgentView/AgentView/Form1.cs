@@ -205,6 +205,37 @@ namespace AgentView
                 await EndCall(callSid);
                 PanelIncomingCalls.Controls.Remove(callCtrl);
             };
+            callCtrl.OnHold += async (isOnHold) =>
+            {
+                if (isOnHold)
+                    await PutOnHold(callSid);
+                else
+                    await TakeOffHold(callSid);
+            };
+        }
+
+        private async Task PutOnHold(string callSid)
+        {
+            if (agentws == null || agentws.State != WebSocketState.Open) return;
+
+            var msg = JsonSerializer.Serialize(new
+            {
+                Action = "putOnHold",
+                CallSid = callSid
+            });
+            await agentws.SendAsync(Encoding.UTF8.GetBytes(msg), WebSocketMessageType.Text, true, CancellationToken.None);
+        }
+
+        private async Task TakeOffHold(string callSid)
+        {
+            if (agentws == null || agentws.State != WebSocketState.Open) return;
+
+            var msg = JsonSerializer.Serialize(new
+            {
+                Action = "takeOffHold",
+                CallSid = callSid
+            });
+            await agentws.SendAsync(Encoding.UTF8.GetBytes(msg), WebSocketMessageType.Text, true, CancellationToken.None);
         }
 
         private async Task EndCall(string callSid)
@@ -319,6 +350,8 @@ namespace AgentView
             await agentws.SendAsync(bytes, WebSocketMessageType.Text, true, CancellationToken.None);
             Console.WriteLine($"Sent redirectDTMF for CallSid {currentCallSid}");
         }
+
+
 
         /// <summary>
         /// When form is closed, close everything

@@ -39,9 +39,20 @@ var callToStreamSid = new ConcurrentDictionary<string, string>();
 var app = builder.Build();
 app.UseForwardedHeaders();
 app.UseWebSockets();
+app.UseStaticFiles();
+Console.WriteLine($"WebRoot: {app.Environment.WebRootPath}");
 
 // Default route
 app.MapGet("/", () => "Hello World.");
+
+// Hold endpoint
+app.MapPost("/hold", (HttpRequest req) =>
+{
+    var response = new VoiceResponse();
+    response.Play(new Uri($"https://{req.Host}/hold.mp3"), loop: 0);
+
+    return Results.Text(response.ToString(), "text/xml", Encoding.UTF8);
+});
 
 // DTMF server endpoint
 app.MapPost("/dtmf", (HttpRequest request) =>
@@ -93,7 +104,6 @@ app.MapPost("/voice", async (HttpRequest req) =>
     var response = new VoiceResponse();
     var connect = new Twilio.TwiML.Voice.Connect();
     response.Say("Please wait to be connected to an agent.");
-    response.Pause(length: 30);
     connect.Stream(url: $"wss://{req.Host}/stream"); // Connect to audio/WebSocketMessage stream
     response.Append(connect);
 
@@ -301,6 +311,32 @@ app.MapGet("/agent", async (HttpContext context) =>
                         await agent.Value.SendAsync(Encoding.UTF8.GetBytes(answeredMsg), WebSocketMessageType.Text, true, CancellationToken.None);
                     }
                 }
+            }
+
+            if (actionProp.GetString() == "putOnHold")
+            {
+                var callSid = doc.RootElement.GetProperty("CallSid").GetString();
+                Console.WriteLine($"Putting call {callSid} on hold");
+
+                CallResource.Update(
+                    pathSid: callSid,
+                    url: new Uri($"https://{context.Request.Host}/hold"),
+                    method: Twilio.Http.HttpMethod.Post
+                );
+                //twilioStreams.TryRemove(callSid, out _);
+                //callToStreamSid.TryRemove(callSid, out _);
+            }
+
+            if (actionProp.GetString() == "takeOffHold")
+            {
+                var callSid = doc.RootElement.GetProperty("CallSid").GetString();
+                Console.WriteLine($"Taking call {callSid} off hold");
+
+                CallResource.Update(
+                    pathSid: callSid,
+                    url: new Uri($"https://{context.Request.Host}/connect"),
+                    method: Twilio.Http.HttpMethod.Post
+                );
             }
 
             if (actionProp.GetString() == "endCall")

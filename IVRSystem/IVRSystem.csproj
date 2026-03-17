@@ -13,4 +13,9 @@
     <PackageReference Include="Vosk" Version="0.3.38" />
   </ItemGroup>
 
+  <ItemGroup>
+  <Content Update="wwwroot\hold.mp3">
+    <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+  </Content>
+</ItemGroup>
 </Project>

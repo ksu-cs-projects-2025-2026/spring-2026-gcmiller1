@@ -19,12 +19,15 @@ namespace AgentView
         public event EventHandler CallEnded;
         public event Action<bool> MuteUnmute;
         public event EventHandler SendToDTMF;
+        public event Action<bool> OnHold;
         private bool IsMuted;
+        private bool IsOnHold;
         public OnCallControl(string callSid, string from)
         {
             CallSid = callSid;
             FromNumber = from;
             IsMuted = false;
+            IsOnHold = false;
             InitializeComponent();
             timer_Call.Interval = 1000;
             timer_Call.Tick += Timer_Call_Tick;
@@ -69,6 +72,26 @@ namespace AgentView
         private void btn_DTMF_Click(object sender, EventArgs e)
         {
             SendToDTMF?.Invoke(this, EventArgs.Empty);
+        }
+
+        private void btn_Hold_Click(object sender, EventArgs e)
+        {
+            if (IsOnHold == false)
+            {
+                btn_Hold.BackColor = SystemColors.ButtonHighlight;
+                btn_Hold.BackgroundImage = Properties.Resources.play;
+                btn_Hold.BackgroundImageLayout = ImageLayout.Stretch;
+                OnHold?.Invoke(true);
+                IsOnHold = true;
+            }
+            else
+            {
+                btn_Hold.BackColor = SystemColors.ControlDark;
+                btn_Hold.BackgroundImage = Properties.Resources.pause;
+                btn_Hold.BackgroundImageLayout = ImageLayout.Stretch;
+                OnHold?.Invoke(false);
+                IsOnHold = false;
+            }
         }
     }
 }

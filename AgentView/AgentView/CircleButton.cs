@@ -33,7 +33,7 @@ namespace AgentView
 
             using (Pen pen = new Pen(Color.Black, 2))
             {
-                e.Graphics.DrawEllipse(pen, 0, 0, Width - 1, Height - 1);
+                e.Graphics.DrawEllipse(pen, 0, 0, Width, Height);
             }
         }
     }
