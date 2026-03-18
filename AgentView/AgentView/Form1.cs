@@ -17,7 +17,9 @@ namespace AgentView
         private BufferedWaveProvider bufferProvider;
         private WaveInEvent waveIn;
         private string currentCallSid;
+        private bool hold = false;
         private Dictionary<string, IncomingCallControl> incomingCallRows = new();
+        private List<(string CallSid, string From)> pendingCalls = new();
         private AgentStatus Status;
         private OnCallControl activeCallControl;
         private bool micMuted = false;
@@ -27,6 +29,8 @@ namespace AgentView
             InitializeComponent();
             this.Load += Form1_Load;
             PopulateStatusDropdown();
+            Status = AgentStatus.Available;
+            comboBox1.SelectedItem = AgentStatus.Available;
         }
 
         private void PopulateStatusDropdown()
@@ -46,9 +50,14 @@ namespace AgentView
 
         private void SetAgentOnCall()
         {
-            comboBox1.Enabled = false;
-            comboBox1.Text = AgentStatus.OnCall.ToString();
             Status = AgentStatus.OnCall;
+            var list = ((List<AgentStatus>)comboBox1.DataSource).ToList();
+            if (!list.Contains(AgentStatus.OnCall)) list.Add(AgentStatus.OnCall);
+
+            comboBox1.DataSource = null;
+            comboBox1.DataSource = list;
+            comboBox1.SelectedItem = AgentStatus.OnCall;
+            comboBox1.Enabled = false;
         }
 
         /// <summary>
@@ -120,41 +129,39 @@ namespace AgentView
 
                                 this.Invoke(() =>
                                 {
-                                    AddIncomingCallUI(callSid, from);
+                                    if (Status == AgentStatus.Available)
+                                    {
+                                        AddIncomingCallUI(callSid, from);
+                                    }
+                                    else
+                                    {
+                                        pendingCalls.Add((callSid, from));
+                                    }
                                 });
                             }
                             if (evtProp.GetString() == "endCall")
                             {
                                 var callSid = doc.RootElement.GetProperty("CallSid").GetString();
                                 Console.WriteLine($"Call ended: {callSid}");
-
                                 this.Invoke(() =>
                                 {
-                                    if (activeCallControl != null && activeCallControl.CallSid == callSid)
+                                    if (activeCallControl != null && activeCallControl.CallSid == callSid && hold == false)
                                     {
-                                        PanelIncomingCalls.Controls.Remove(activeCallControl);
-                                        activeCallControl.Dispose();
+                                        PanelActiveCall.Controls.Clear();
+                                        PanelActiveCall.Visible = false;
                                         activeCallControl = null;
+                                        currentCallSid = "";
+                                        SetAgentOffCall();
+                                        return;
                                     }
 
-                                    currentCallSid = "";
-                                    SetAgentOffCall();
                                 });
                             }
 
                             if (evtProp.GetString() == "callAnswered")
                             {
                                 var callSid = doc.RootElement.GetProperty("CallSid").GetString();
-
-                                this.Invoke(() =>
-                                {
-                                    if (incomingCallRows.TryGetValue(callSid, out var ctrl))
-                                    {
-                                        PanelIncomingCalls.Controls.Remove(ctrl);
-                                        ctrl.Dispose();
-                                        incomingCallRows.Remove(callSid);
-                                    }
-                                });
+                                RemoveCallUI(callSid);
                             }
                         }
                     }
@@ -177,6 +184,15 @@ namespace AgentView
             });
         }
 
+        private void FlushPendingCalls()
+        {
+            foreach (var call in pendingCalls)
+            {
+                AddIncomingCallUI(call.CallSid, call.From);
+            }
+
+            pendingCalls.Clear();
+        }
         private async Task AcceptCall(string callSid, string fromNumber)
         {
             currentCallSid = callSid;
@@ -187,37 +203,51 @@ namespace AgentView
                     Action = "acceptCall",
                     CallSid = callSid
                 });
-
             await agentws.SendAsync(Encoding.UTF8.GetBytes(msg), WebSocketMessageType.Text, true, CancellationToken.None);
             Console.WriteLine($"Accepted call {callSid}");
             SetAgentOnCall();
-
+            PanelIncomingCalls.Visible = false;
+            PanelActiveCall.Visible = true;
+            PanelActiveCall.BringToFront();
             var callCtrl = new OnCallControl(callSid, fromNumber)
             {
-                Dock = DockStyle.Fill
+                Dock = DockStyle.Fill,
+                Size = new Size(558, 456)
             };
+            PanelActiveCall.Controls.Add(callCtrl);
+            activeCallControl = callCtrl;
+
+
             callCtrl.MuteUnmute += ToggleMicMute;
             callCtrl.SendToDTMF += async (_, __) => await SendToDTMF();
-            PanelIncomingCalls.Controls.Add(callCtrl);
-            activeCallControl = callCtrl;
+
             callCtrl.CallEnded += async (_, __) =>
             {
                 await EndCall(callSid);
-                PanelIncomingCalls.Controls.Remove(callCtrl);
+                PanelActiveCall.Controls.Clear();
+                PanelActiveCall.Visible = false;
+                if (Status == AgentStatus.Available)
+                {
+                    PanelIncomingCalls.Visible = true;
+                }
             };
             callCtrl.OnHold += async (isOnHold) =>
             {
                 if (isOnHold)
                     await PutOnHold(callSid);
                 else
+                {
                     await TakeOffHold(callSid);
+                    currentCallSid = callSid;
+                }
+
             };
         }
 
         private async Task PutOnHold(string callSid)
         {
             if (agentws == null || agentws.State != WebSocketState.Open) return;
-
+            hold = true;
             var msg = JsonSerializer.Serialize(new
             {
                 Action = "putOnHold",
@@ -235,13 +265,14 @@ namespace AgentView
                 Action = "takeOffHold",
                 CallSid = callSid
             });
+            hold = false;
             await agentws.SendAsync(Encoding.UTF8.GetBytes(msg), WebSocketMessageType.Text, true, CancellationToken.None);
         }
 
         private async Task EndCall(string callSid)
         {
             currentCallSid = callSid;
-
+            SetAgentOffCall();
             var msg = JsonSerializer.Serialize(
                 new
                 {
@@ -251,36 +282,53 @@ namespace AgentView
 
             await agentws.SendAsync(Encoding.UTF8.GetBytes(msg), WebSocketMessageType.Text, true, CancellationToken.None);
             Console.WriteLine($"Ended call {callSid}");
-            SetAgentOffCall();
+            //RemoveCallUI(callSid);
+            activeCallControl = null;
         }
 
         private void SetAgentOffCall()
         {
             comboBox1.Enabled = true;
+
+            var list = ((List<AgentStatus>)comboBox1.DataSource).ToList();
+            if (!list.Contains(AgentStatus.Available)) list.Add(AgentStatus.Available);
+
+            comboBox1.DataSource = null;
+            comboBox1.DataSource = list;
             comboBox1.SelectedItem = AgentStatus.Available;
+
+            Status = AgentStatus.Available;
         }
 
         private void AddIncomingCallUI(string callSid, string fromNumber)
         {
             if (incomingCallRows.ContainsKey(callSid)) return;
-            var ctrl = new IncomingCallControl(callSid, fromNumber)
-            {
-                Dock = DockStyle.Top
-            };
-
+            var ctrl = new IncomingCallControl(callSid, fromNumber);
+            ctrl.Width = PanelIncomingCalls.ClientSize.Width - 20;
 
 
             ctrl.Accepted += async (_, __) =>
             {
                 await AcceptCall(callSid, fromNumber);
-                PanelIncomingCalls.Controls.Remove(ctrl);
-                incomingCallRows.Remove(callSid);
+                RemoveCallUI(callSid);
             };
 
             PanelIncomingCalls.Controls.Add(ctrl);
             PanelIncomingCalls.Controls.SetChildIndex(ctrl, 0);
 
             incomingCallRows[callSid] = ctrl;
+        }
+
+        private void RemoveCallUI(string callSid)
+        {
+            if (incomingCallRows.TryGetValue(callSid, out var incomingCtrl))
+            {
+                PanelIncomingCalls.Controls.Remove(incomingCtrl);
+                incomingCtrl.Dispose();
+                incomingCallRows.Remove(callSid);
+            }
+
+            pendingCalls.RemoveAll(c => c.CallSid == callSid);
         }
 
         private void MicCapture()
@@ -365,38 +413,6 @@ namespace AgentView
             base.OnFormClosing(e);
         }
 
-        /// <summary>
-        /// When SendToDTMF button is clicked, send message to server to redirect that call to the DTMF line
-        /// </summary>
-        /// <param name="sender"></param>
-        /// <param name="e"></param>
-        /*private async void Btn_SendToDTMF_Click(object sender, EventArgs e)
-        {
-            if (agentws == null || agentws.State != WebSocketState.Open)
-            {
-                MessageBox.Show("WebSocket not connected");
-                return;
-            }
-
-            if (string.IsNullOrEmpty(currentCallSid))
-            {
-                MessageBox.Show("No CallSid available");
-                return;
-            }
-
-            // Send message to server to redirect caller to DTMF
-            var ctrlMsg = new
-            {
-                Action = "redirectDTMF",
-                CallSid = currentCallSid
-            };
-
-            var json = JsonSerializer.Serialize(ctrlMsg);
-            var bytes = Encoding.UTF8.GetBytes(json);
-
-            await agentws.SendAsync(bytes, WebSocketMessageType.Text, true, CancellationToken.None);
-            Console.WriteLine($"Sent redirectDTMF for CallSid {currentCallSid}");
-        }*/
 
         private void lb_Status_Click(object sender, EventArgs e)
         {
@@ -410,7 +426,46 @@ namespace AgentView
 
         private void comboBox1_SelectedIndexChanged(object sender, EventArgs e)
         {
+            if (comboBox1.SelectedItem == null) return;
             Status = (AgentStatus)comboBox1.SelectedItem;
+            if (Status == AgentStatus.OnCall) return;
+            if (activeCallControl != null)
+            {
+                PanelActiveCall.Visible = true;
+                PanelIncomingCalls.Visible = false;
+                return;
+            }
+            if (Status == AgentStatus.Available)
+            {
+                PanelIncomingCalls.Visible = true;
+                PanelActiveCall.Visible = false;
+
+                foreach (var kvp in incomingCallRows)
+                {
+                    var ctrl = kvp.Value;
+                    if (!PanelIncomingCalls.Controls.Contains(ctrl))
+                    {
+                        PanelIncomingCalls.Controls.Add(ctrl);
+                        PanelIncomingCalls.Controls.SetChildIndex(ctrl, 0);
+                    }
+                }
+
+                FlushPendingCalls();
+            }
+            else
+            {
+                PanelIncomingCalls.Visible = false;
+            }
+        }
+
+        private void btn_History_Click(object sender, EventArgs e)
+        {
+
+        }
+
+        private void Form1_Load_1(object sender, EventArgs e)
+        {
+
         }
     }
 }

@@ -8,6 +8,7 @@ using System.Collections.Concurrent;
 using Twilio;
 using Twilio.Rest.Api.V2010.Account;
 using Twilio.Types;
+using Task = System.Threading.Tasks.Task;
 
 #region
 string accountSid = Environment.GetEnvironmentVariable("TWILIO_ACCOUNT_SID");
@@ -36,11 +37,36 @@ var agentSockets = new ConcurrentDictionary<Guid, WebSocket>();
 
 var callToStreamSid = new ConcurrentDictionary<string, string>();
 
+// Track state of each call to determine how to interpret "stop" message from twilio
+var callState = new ConcurrentDictionary<string, string>();
+
+// Method to clean up calls that have ended
+async Task BroadcastCallEnded(string callSid)
+{
+    var msg = JsonSerializer.Serialize(new
+    {
+        @event = "endCall",
+        CallSid = callSid
+    });
+
+    foreach (var agent in agentSockets.Values)
+    {
+        if (agent.State == WebSocketState.Open)
+        {
+            await agent.SendAsync(Encoding.UTF8.GetBytes(msg), WebSocketMessageType.Text, true, CancellationToken.None);
+        }
+    }
+
+    twilioStreams.TryRemove(callSid, out _);
+    callToStreamSid.TryRemove(callSid, out _);
+    activeCalls.TryRemove(callSid, out _);
+    callState.TryRemove(callSid, out _);
+}
+
 var app = builder.Build();
 app.UseForwardedHeaders();
 app.UseWebSockets();
 app.UseStaticFiles();
-Console.WriteLine($"WebRoot: {app.Environment.WebRootPath}");
 
 // Default route
 app.MapGet("/", () => "Hello World.");
@@ -49,9 +75,25 @@ app.MapGet("/", () => "Hello World.");
 app.MapPost("/hold", (HttpRequest req) =>
 {
     var response = new VoiceResponse();
-    response.Play(new Uri($"https://{req.Host}/hold.mp3"), loop: 0);
+    response.Play(new Uri($"https://{req.Host}/hold_quiet.mp3"), loop: 0);
 
     return Results.Text(response.ToString(), "text/xml", Encoding.UTF8);
+});
+
+app.MapPost("/status", async (HttpRequest req) =>
+{
+    var form = await req.ReadFormAsync();
+
+    var callSid = form["CallSid"].ToString();
+    var status = form["CallStatus"].ToString();
+    Console.WriteLine($"[STATUS] Call {callSid} -> {status}");
+
+    if (status == "completed" || status == "canceled" || status == "no-answer")
+    {
+        Console.WriteLine($"Call ended ({status}): {callSid}");
+        await BroadcastCallEnded(callSid);
+    }
+    return Results.Ok();
 });
 
 // DTMF server endpoint
@@ -66,7 +108,7 @@ app.MapPost("/dtmf", (HttpRequest request) =>
         finishOnKey: "#",
         method: "POST"
     );
-    gather.Say("Enter payment number on your keypad.");
+    gather.Say("Enter payment card number into your keypad, followed by the pound sign.");
     response.Append(gather);
     response.Say("We did not receive your input. Please try again.");
     response.Redirect(new Uri("/dtmf", UriKind.Relative));
@@ -83,6 +125,13 @@ app.MapPost("/voice", async (HttpRequest req) =>
 
     // Store callSid so it can be redirected later
     activeCalls[callSid] = callSid;
+    callState[callSid] = "incoming";
+
+    CallResource.Update(
+    pathSid: callSid,
+    statusCallback: new Uri($"https://{req.Host}/status"),
+    statusCallbackMethod: Twilio.Http.HttpMethod.Post
+    );
     var incomingMsg = JsonSerializer.Serialize(new
     {
         @event = "IncomingCall",
@@ -102,10 +151,8 @@ app.MapPost("/voice", async (HttpRequest req) =>
         }
     }
     var response = new VoiceResponse();
-    var connect = new Twilio.TwiML.Voice.Connect();
     response.Say("Please wait to be connected to an agent.");
-    connect.Stream(url: $"wss://{req.Host}/stream"); // Connect to audio/WebSocketMessage stream
-    response.Append(connect);
+    response.Pause(length: 60);
 
     return Results.Text(response.ToString(), "text/xml", Encoding.UTF8);
 });
@@ -184,11 +231,12 @@ app.MapGet("/stream", async (HttpContext context) =>
                 {
                     Console.WriteLine("Twilio stream stopped");
                     Console.WriteLine($"Call ended: {callSid}");
-
+                    var state = callState.GetValueOrDefault(callSid, "unknown");
                     // cleanup
-                    twilioStreams.TryRemove(callSid, out _);
-                    callToStreamSid.TryRemove(callSid, out _);
-                    activeCalls.TryRemove(callSid, out _);
+                    if (state != "agent_hangup")
+                    {
+                        await BroadcastCallEnded(callSid);
+                    }
 
                     /*var endMsg = JsonSerializer.Serialize(new
                     {
@@ -276,8 +324,12 @@ app.MapGet("/agent", async (HttpContext context) =>
                 CallResource.Update(
                     pathSid: callSid,
                     url: new Uri($"https://uncoquettishly-bilgiest-bronson.ngrok-free.dev/dtmf"),
-                    method: Twilio.Http.HttpMethod.Post
+                    method: Twilio.Http.HttpMethod.Post,
+                    statusCallback: new Uri($"https://{context.Request.Host}/status"),
+                    statusCallbackMethod: Twilio.Http.HttpMethod.Post
                 );
+
+                callState[callSid] = "redirecting";
                 Console.WriteLine($"Call {callSid} redirected to /dtmf");
             }
 
@@ -288,8 +340,12 @@ app.MapGet("/agent", async (HttpContext context) =>
                 CallResource.Update(
                     pathSid: callSid,
                     url: new Uri($"https://uncoquettishly-bilgiest-bronson.ngrok-free.dev/connect"),
-                    method: Twilio.Http.HttpMethod.Post
+                    method: Twilio.Http.HttpMethod.Post,
+                    statusCallback: new Uri($"https://{context.Request.Host}/status"),
+                    statusCallbackMethod: Twilio.Http.HttpMethod.Post
                 );
+
+                callState[callSid] = "connected";
                 var startMsg = JsonSerializer.Serialize(
                     new
                     {
@@ -321,10 +377,12 @@ app.MapGet("/agent", async (HttpContext context) =>
                 CallResource.Update(
                     pathSid: callSid,
                     url: new Uri($"https://{context.Request.Host}/hold"),
-                    method: Twilio.Http.HttpMethod.Post
+                    method: Twilio.Http.HttpMethod.Post,
+                    statusCallback: new Uri($"https://{context.Request.Host}/status"),
+                    statusCallbackMethod: Twilio.Http.HttpMethod.Post
                 );
-                //twilioStreams.TryRemove(callSid, out _);
-                //callToStreamSid.TryRemove(callSid, out _);
+
+                callState[callSid] = "hold";
             }
 
             if (actionProp.GetString() == "takeOffHold")
@@ -335,14 +393,19 @@ app.MapGet("/agent", async (HttpContext context) =>
                 CallResource.Update(
                     pathSid: callSid,
                     url: new Uri($"https://{context.Request.Host}/connect"),
-                    method: Twilio.Http.HttpMethod.Post
+                    method: Twilio.Http.HttpMethod.Post,
+                    statusCallback: new Uri($"https://{context.Request.Host}/status"),
+                    statusCallbackMethod: Twilio.Http.HttpMethod.Post
                 );
+
+                callState[callSid] = "connected";
             }
 
             if (actionProp.GetString() == "endCall")
             {
                 var callSid = doc.RootElement.GetProperty("CallSid").GetString();
                 Console.WriteLine($"Agent requested endCall for {callSid}");
+                callState[callSid] = "agent_hangup";
 
                 // Hang up call via Twilio
                 CallResource.Update(

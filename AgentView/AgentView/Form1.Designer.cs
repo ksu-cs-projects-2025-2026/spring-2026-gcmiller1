@@ -34,6 +34,7 @@
             btn_Home = new Button();
             btn_History = new Button();
             panel_Menu = new Panel();
+            PanelActiveCall = new Panel();
             panel_Top = new Panel();
             panel_Logo = new Panel();
             pictureBox1 = new PictureBox();
@@ -71,8 +72,7 @@
             // 
             // PanelIncomingCalls
             // 
-            PanelIncomingCalls.AutoSize = true;
-            PanelIncomingCalls.AutoSizeMode = AutoSizeMode.GrowAndShrink;
+            PanelIncomingCalls.AutoScroll = true;
             PanelIncomingCalls.BackColor = Color.FromArgb(242, 246, 248);
             PanelIncomingCalls.Dock = DockStyle.Fill;
             PanelIncomingCalls.Location = new Point(155, 66);
@@ -115,6 +115,7 @@
             btn_History.Text = "  Call History";
             btn_History.TextImageRelation = TextImageRelation.ImageBeforeText;
             btn_History.UseVisualStyleBackColor = true;
+            btn_History.Click += btn_History_Click;
             // 
             // panel_Menu
             // 
@@ -126,6 +127,16 @@
             panel_Menu.Name = "panel_Menu";
             panel_Menu.Size = new Size(155, 478);
             panel_Menu.TabIndex = 6;
+            // 
+            // PanelActiveCall
+            // 
+            PanelActiveCall.BackColor = SystemColors.ControlDarkDark;
+            PanelActiveCall.Dock = DockStyle.Fill;
+            PanelActiveCall.Location = new Point(155, 66);
+            PanelActiveCall.Name = "PanelActiveCall";
+            PanelActiveCall.Size = new Size(738, 444);
+            PanelActiveCall.TabIndex = 9;
+            PanelActiveCall.Visible = false;
             // 
             // panel_Top
             // 
@@ -174,12 +185,12 @@
             BackColor = Color.FromArgb(242, 246, 248);
             ClientSize = new Size(893, 510);
             Controls.Add(PanelIncomingCalls);
+            Controls.Add(PanelActiveCall);
             Controls.Add(panel1);
             Controls.Add(panel_Menu);
             Controls.Add(panel_Top);
             MinimumSize = new Size(909, 549);
             Name = "Form1";
-            Text = "Form1";
             panel_Menu.ResumeLayout(false);
             panel_Top.ResumeLayout(false);
             panel_Logo.ResumeLayout(false);
@@ -187,20 +198,20 @@
             panel1.ResumeLayout(false);
             panel1.PerformLayout();
             ResumeLayout(false);
-            PerformLayout();
         }
 
         #endregion
 
         private Label lb_Status;
         private ComboBox comboBox1;
-        private Panel PanelIncomingCalls;
+        private System.Windows.Forms.Panel PanelIncomingCalls;
         private Button btn_Home;
         private Button btn_History;
-        private Panel panel_Menu;
-        private Panel panel_Top;
-        private Panel panel_Logo;
+        private System.Windows.Forms.Panel panel_Menu;
+        private System.Windows.Forms.Panel panel_Top;
+        private System.Windows.Forms.Panel panel_Logo;
         private PictureBox pictureBox1;
-        private Panel panel1;
+        private System.Windows.Forms.Panel panel1;
+        private System.Windows.Forms.Panel PanelActiveCall;
     }
 }

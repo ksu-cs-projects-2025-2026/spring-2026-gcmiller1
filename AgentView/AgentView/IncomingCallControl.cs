@@ -21,7 +21,7 @@ namespace AgentView
             InitializeComponent();
             CallSid = callSid;
             FromNumber = fromNumber;
-
+            this.Height = 40;
             label1.Text = $"Incoming Call: {FormatPhone(FromNumber)}";
         }
 

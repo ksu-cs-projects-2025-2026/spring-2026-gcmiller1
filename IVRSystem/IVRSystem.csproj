@@ -14,7 +14,7 @@
   </ItemGroup>
 
   <ItemGroup>
-  <Content Update="wwwroot\hold.mp3">
+  <Content Update="wwwroot\hold_quiet.mp3">
     <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
   </Content>
 </ItemGroup>
