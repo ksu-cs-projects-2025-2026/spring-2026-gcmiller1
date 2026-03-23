@@ -130,7 +130,7 @@
             // 
             // PanelActiveCall
             // 
-            PanelActiveCall.BackColor = SystemColors.ControlDarkDark;
+            PanelActiveCall.BackColor = Color.FromArgb(242, 246, 248);
             PanelActiveCall.Dock = DockStyle.Fill;
             PanelActiveCall.Location = new Point(155, 66);
             PanelActiveCall.Name = "PanelActiveCall";

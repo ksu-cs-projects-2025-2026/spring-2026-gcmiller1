@@ -229,30 +229,7 @@ app.MapGet("/stream", async (HttpContext context) =>
                 }
                 else if (evt == "stop")
                 {
-                    Console.WriteLine("Twilio stream stopped");
-                    Console.WriteLine($"Call ended: {callSid}");
-                    var state = callState.GetValueOrDefault(callSid, "unknown");
-                    // cleanup
-                    if (state != "agent_hangup")
-                    {
-                        await BroadcastCallEnded(callSid);
-                    }
-
-                    /*var endMsg = JsonSerializer.Serialize(new
-                    {
-                        @event = "endCall",
-                        CallSid = callSid
-                    });
-
-                    foreach (var agent in agentSockets.Values)
-                    {
-                        if (agent.State == WebSocketState.Open)
-                        {
-                            await agent.SendAsync(Encoding.UTF8.GetBytes(endMsg), WebSocketMessageType.Text, true, CancellationToken.None);
-                        }
-                    }
-                    */
-                    break;
+                    Console.WriteLine($"Stream stopped for {callSid}");
                 }
 
             }
