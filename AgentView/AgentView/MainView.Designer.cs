@@ -1,6 +1,6 @@
 ﻿namespace AgentView
 {
-    partial class Form1
+    partial class MainView
     {
         /// <summary>
         ///  Required designer variable.
@@ -178,7 +178,7 @@
             panel1.Size = new Size(738, 34);
             panel1.TabIndex = 8;
             // 
-            // Form1
+            // MainView
             // 
             AutoScaleDimensions = new SizeF(7F, 15F);
             AutoScaleMode = AutoScaleMode.Font;
@@ -190,7 +190,7 @@
             Controls.Add(panel_Menu);
             Controls.Add(panel_Top);
             MinimumSize = new Size(909, 549);
-            Name = "Form1";
+            Name = "MainView";
             panel_Menu.ResumeLayout(false);
             panel_Top.ResumeLayout(false);
             panel_Logo.ResumeLayout(false);

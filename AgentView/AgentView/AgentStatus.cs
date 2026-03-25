@@ -6,6 +6,9 @@ using System.Threading.Tasks;
 
 namespace AgentView
 {
+    /// <summary>
+    /// The possible statuses the agent can have
+    /// </summary>
     public enum AgentStatus
     {
         Available,
