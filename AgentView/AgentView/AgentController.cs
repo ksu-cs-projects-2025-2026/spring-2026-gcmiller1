@@ -84,11 +84,26 @@ namespace AgentView
             view.ResumeRequested += TakeOffHold;
             view.MuteToggled += ToggleMicMute;
             view.DtmfRequested += SendToDTMF;
+            view.CardVerificationRequested += StartCardVerification;
 
             view.StatusChanged += status =>
             {
                 agent.SetStatus(status);
             };
+        }
+
+        /// <summary>
+        /// Tells the server to start listening to keypad inputs during the call.
+        /// </summary>
+        /// <param name="callSid">The id of the call</param>
+        /// <returns></returns>
+        private async Task StartCardVerification(string callSid)
+        {
+            await commService.SendJsonAsync(new
+            {
+                Action = "startCardVerification",
+                CallSid = callSid
+            });
         }
 
         /// <summary>
@@ -161,6 +176,17 @@ namespace AgentView
                                 view.RemoveCallUI(callSid);
                                 callManager.EndCall(callSid);
                             }
+                        });
+                    }
+
+                    if (evt == "cardVerificationResult")
+                    {
+                        var callSid = doc.RootElement.GetProperty("CallSid").GetString();
+                        var success = doc.RootElement.GetProperty("Success").GetBoolean();
+
+                        view.Invoke(() =>
+                        {
+                            view.ShowVerificationResult(callSid, success);
                         });
                     }
 

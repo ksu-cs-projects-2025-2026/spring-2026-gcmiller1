@@ -22,12 +22,15 @@ namespace AgentView
         public event Action<bool> OnHold;
         private bool IsMuted;
         private bool IsOnHold;
+        private bool IsVerifyingCard;
+        public event EventHandler VerifyCardRequested;
         public OnCallControl(string callSid, string from)
         {
             CallSid = callSid;
             FromNumber = from;
             IsMuted = false;
             IsOnHold = false;
+            IsVerifyingCard = false;
             InitializeComponent();
             timer_Call.Interval = 1000;
             timer_Call.Tick += Timer_Call_Tick;
@@ -94,6 +97,28 @@ namespace AgentView
             }
         }
 
+        private void btn_CardVerify_Click(object sender, EventArgs e)
+        {
+            if (!IsVerifyingCard)
+            {
+                VerifyCardRequested?.Invoke(this, EventArgs.Empty);
+                lb_VerifyResult.Text = "Waiting for input...";
+                btn_CardVerify.Enabled = false;
+                IsVerifyingCard = true;
+            }
+        }
 
+        public void ShowVerificationResult(bool success)
+        {
+            if (success)
+            {
+                lb_VerifyResult.Text = "Card Verified";
+                btn_CardVerify.Enabled = true;
+            }
+            else
+            {
+                lb_VerifyResult.Text = "Card Invalid";
+            }
+        }
     }
 }

@@ -18,6 +18,7 @@ namespace AgentView
         public event Func<string, Task> ResumeRequested;
         public event Func<bool, Task> MuteToggled;
         public event Func<Task> DtmfRequested;
+        public event Func<string, Task> CardVerificationRequested;
         public event Action<AgentStatus> StatusChanged;
 
         private readonly Dictionary<string, IncomingCallControl> incomingCallRows = new();
@@ -74,6 +75,19 @@ namespace AgentView
             comboBox1.DataSource = list;
             comboBox1.SelectedItem = AgentStatus.OnCall;
             comboBox1.Enabled = false;
+        }
+
+        /// <summary>
+        /// Shows in the OnCallControl if the caller successfully verified their card
+        /// </summary>
+        /// <param name="callSid">the id of the call</param>
+        /// <param name="success">if the verification was successful</param>
+        public void ShowVerificationResult(string callSid, bool success)
+        {
+            if (activeCallControl != null && activeCallControl.CallSid == callSid)
+            {
+                activeCallControl.ShowVerificationResult(success);
+            }
         }
 
         /// <summary>
@@ -225,6 +239,14 @@ namespace AgentView
                     {
                         await ResumeRequested(callSid);
                     }
+                }
+            };
+
+            callCtrl.VerifyCardRequested += async (_, __) =>
+            {
+                if (CardVerificationRequested != null)
+                {
+                    await CardVerificationRequested(callSid);
                 }
             };
         }

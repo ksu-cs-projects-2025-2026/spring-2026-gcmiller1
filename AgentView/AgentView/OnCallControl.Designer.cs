@@ -37,6 +37,8 @@
             btn_MuteMic = new CircleButton();
             btn_DTMF = new CircleButton();
             btn_Hold = new CircleButton();
+            btn_CardVerify = new CircleButton();
+            lb_VerifyResult = new Label();
             SuspendLayout();
             // 
             // label_Timer
@@ -119,10 +121,33 @@
             btn_Hold.UseVisualStyleBackColor = false;
             btn_Hold.Click += btn_Hold_Click;
             // 
+            // btn_CardVerify
+            // 
+            btn_CardVerify.BackgroundImage = (Image)resources.GetObject("btn_CardVerify.BackgroundImage");
+            btn_CardVerify.BackgroundImageLayout = ImageLayout.Stretch;
+            btn_CardVerify.Location = new Point(328, 182);
+            btn_CardVerify.Name = "btn_CardVerify";
+            btn_CardVerify.Size = new Size(80, 80);
+            btn_CardVerify.TabIndex = 6;
+            btn_CardVerify.UseVisualStyleBackColor = true;
+            btn_CardVerify.Click += btn_CardVerify_Click;
+            // 
+            // lb_VerifyResult
+            // 
+            lb_VerifyResult.Dock = DockStyle.Top;
+            lb_VerifyResult.Font = new Font("Figtree", 14.25F, FontStyle.Regular, GraphicsUnit.Point, 0);
+            lb_VerifyResult.Location = new Point(0, 98);
+            lb_VerifyResult.Name = "lb_VerifyResult";
+            lb_VerifyResult.Size = new Size(558, 30);
+            lb_VerifyResult.TabIndex = 7;
+            lb_VerifyResult.TextAlign = ContentAlignment.MiddleCenter;
+            // 
             // OnCallControl
             // 
             AutoScaleDimensions = new SizeF(7F, 15F);
             AutoScaleMode = AutoScaleMode.Font;
+            Controls.Add(lb_VerifyResult);
+            Controls.Add(btn_CardVerify);
             Controls.Add(btn_Hold);
             Controls.Add(btn_DTMF);
             Controls.Add(btn_MuteMic);
@@ -143,5 +168,7 @@
         private CircleButton btn_MuteMic;
         private CircleButton btn_DTMF;
         private CircleButton btn_Hold;
+        private CircleButton btn_CardVerify;
+        private Label lb_VerifyResult;
     }
 }

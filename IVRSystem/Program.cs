@@ -40,6 +40,13 @@ var callToStreamSid = new ConcurrentDictionary<string, string>();
 // Track state of each call to determine how to interpret "stop" message from twilio
 var callState = new ConcurrentDictionary<string, string>();
 
+var callToAgent = new ConcurrentDictionary<string, Guid>();
+
+var cardVerificationActive = new ConcurrentDictionary<string, bool>();
+
+var cardDigitBuffer = new ConcurrentDictionary<string, StringBuilder>();
+
+
 // Method to clean up calls that have ended
 async Task BroadcastCallEnded(string callSid)
 {
@@ -61,6 +68,9 @@ async Task BroadcastCallEnded(string callSid)
     callToStreamSid.TryRemove(callSid, out _);
     activeCalls.TryRemove(callSid, out _);
     callState.TryRemove(callSid, out _);
+    callToAgent.TryRemove(callSid, out _);
+    cardVerificationActive.TryRemove(callSid, out _);
+    cardDigitBuffer.TryRemove(callSid, out _);
 }
 
 var app = builder.Build();
@@ -210,22 +220,68 @@ app.MapGet("/stream", async (HttpContext context) =>
                     if (track == "inbound")
                     {
                         var audioBytes = Convert.FromBase64String(payload);
-
-                        // Forward to all connected WinForm clients
-                        foreach (var agent in agentSockets.Values)
+                        if (callSid != null &&
+                            callToAgent.TryGetValue(callSid, out var assignedAgentId) &&
+                            agentSockets.TryGetValue(assignedAgentId, out var assignedAgentWs) &&
+                            assignedAgentWs.State == WebSocketState.Open)
                         {
-                            if (agent.State == WebSocketState.Open)
-                            {
-                                await agent.SendAsync(
-                                    audioBytes,
-                                    WebSocketMessageType.Binary,
-                                    true,
-                                    CancellationToken.None);
-                            }
+                            await assignedAgentWs.SendAsync(
+                                audioBytes,
+                                WebSocketMessageType.Binary,
+                                true,
+                                CancellationToken.None);
                         }
                     }
                     // Forward to all connected WinForm agents
 
+                }
+                else if (evt == "dtmf")
+                {
+                    var digit = doc.RootElement.GetProperty("dtmf").GetProperty("digit").GetString();
+
+                    if (!string.IsNullOrEmpty(callSid) &&
+                        cardVerificationActive.TryGetValue(callSid, out bool isActive) &&
+                        isActive)
+                    {
+                        if (!string.IsNullOrEmpty(digit))
+                        {
+                            Console.WriteLine($"DTMF for verification on {callSid}: {digit}");
+
+                            var cardbuffer = cardDigitBuffer.GetOrAdd(callSid, _ => new StringBuilder());
+
+                            if (digit == "#")
+                            {
+                                var cardNumber = cardbuffer.ToString();
+                                cardbuffer.Clear();
+                                cardVerificationActive[callSid] = false;
+
+                                bool validLength = cardNumber.Length >= 13 && cardNumber.Length <= 19;
+                                bool isValid = validLength && LuhnCheck(cardNumber);
+
+                                if (callToAgent.TryGetValue(callSid, out var assignedAgent) &&
+                                    agentSockets.TryGetValue(assignedAgent, out var agentWs) &&
+                                    agentWs.State == WebSocketState.Open)
+                                {
+                                    var resultMsg = JsonSerializer.Serialize(new
+                                    {
+                                        @event = "cardVerificationResult",
+                                        CallSid = callSid,
+                                        Success = isValid
+                                    });
+
+                                    await agentWs.SendAsync(
+                                        Encoding.UTF8.GetBytes(resultMsg),
+                                        WebSocketMessageType.Text,
+                                        true,
+                                        CancellationToken.None);
+                                }
+                            }
+                            else if (char.IsDigit(digit[0]))
+                            {
+                                cardbuffer.Append(digit);
+                            }
+                        }
+                    }
                 }
                 else if (evt == "stop")
                 {
@@ -321,8 +377,10 @@ app.MapGet("/agent", async (HttpContext context) =>
                     statusCallback: new Uri($"https://{context.Request.Host}/status"),
                     statusCallbackMethod: Twilio.Http.HttpMethod.Post
                 );
-
                 callState[callSid] = "connected";
+                callToAgent[callSid] = agentId;
+                cardVerificationActive[callSid] = false;
+                cardDigitBuffer[callSid] = new StringBuilder();
                 var startMsg = JsonSerializer.Serialize(
                     new
                     {
@@ -343,6 +401,27 @@ app.MapGet("/agent", async (HttpContext context) =>
                     {
                         await agent.Value.SendAsync(Encoding.UTF8.GetBytes(answeredMsg), WebSocketMessageType.Text, true, CancellationToken.None);
                     }
+                }
+            }
+
+            if (actionProp.GetString() == "startCardVerification")
+            {
+                var callSid = doc.RootElement.GetProperty("CallSid").GetString();
+
+                if (callToAgent.TryGetValue(callSid, out var assignedAgent) && assignedAgent == agentId)
+                {
+                    cardVerificationActive[callSid] = true;
+                    cardDigitBuffer[callSid] = new StringBuilder();
+
+                    Console.WriteLine($"Card verification started for call {callSid}");
+
+                    var msg = JsonSerializer.Serialize(new
+                    {
+                        @event = "verificationStarted",
+                        CallSid = callSid
+                    });
+
+                    await ws.SendAsync(Encoding.UTF8.GetBytes(msg), WebSocketMessageType.Text, true, CancellationToken.None);
                 }
             }
 
@@ -394,6 +473,10 @@ app.MapGet("/agent", async (HttpContext context) =>
                 twilioStreams.TryRemove(callSid, out _);
                 callToStreamSid.TryRemove(callSid, out _);
                 activeCalls.TryRemove(callSid, out _);
+                callState.TryRemove(callSid, out _);
+                callToAgent.TryRemove(callSid, out _);
+                cardVerificationActive.TryRemove(callSid, out _);
+                cardDigitBuffer.TryRemove(callSid, out _);
             }
         }
         catch
