@@ -23,6 +23,7 @@ namespace AgentView
 
         private readonly Dictionary<string, IncomingCallControl> incomingCallRows = new();
         private readonly List<(string CallSid, string From)> pendingCalls = new();
+        private OnCallForm activeCallForm;
         private OnCallControl activeCallControl;
 
 
@@ -187,20 +188,26 @@ namespace AgentView
         public void ShowActiveCall(string callSid, string fromNumber)
         {
             PanelIncomingCalls.Visible = false;
-            PanelActiveCall.Visible = true;
-            PanelActiveCall.BringToFront();
+            PanelActiveCall.Visible = false;
 
-            var callCtrl = new OnCallControl(callSid, fromNumber)
+            if (activeCallForm != null && !activeCallForm.IsDisposed)
             {
-                Dock = DockStyle.Fill,
-                Size = new System.Drawing.Size(558, 456)
-            };
+                activeCallForm.Close();
+                activeCallForm.Dispose();
+                activeCallForm = null;
+                activeCallControl = null;
+            }
 
-            PanelActiveCall.Controls.Clear();
-            PanelActiveCall.Controls.Add(callCtrl);
-            activeCallControl = callCtrl;
+            var callForm = new OnCallForm(callSid, fromNumber);
 
-            callCtrl.MuteUnmute += async mute =>
+            callForm.StartPosition = FormStartPosition.Manual;
+            callForm.Left = this.Right + 10;
+            callForm.Top = this.Top;
+
+            activeCallForm = callForm;
+            activeCallControl = callForm.CallControl;
+
+            activeCallControl.MuteUnmute += async mute =>
             {
                 if (MuteToggled != null)
                 {
@@ -208,7 +215,7 @@ namespace AgentView
                 }
             };
 
-            callCtrl.SendToDTMF += async (_, __) =>
+            activeCallControl.SendToDTMF += async (_, __) =>
             {
                 if (DtmfRequested != null)
                 {
@@ -216,7 +223,7 @@ namespace AgentView
                 }
             };
 
-            callCtrl.CallEnded += async (_, __) =>
+            activeCallControl.CallEnded += async (_, __) =>
             {
                 if (EndCallRequested != null)
                 {
@@ -224,7 +231,7 @@ namespace AgentView
                 }
             };
 
-            callCtrl.OnHold += async isOnHold =>
+            activeCallControl.OnHold += async isOnHold =>
             {
                 if (isOnHold)
                 {
@@ -242,13 +249,23 @@ namespace AgentView
                 }
             };
 
-            callCtrl.VerifyCardRequested += async (_, __) =>
+            activeCallControl.VerifyCardRequested += async (_, __) =>
             {
                 if (CardVerificationRequested != null)
                 {
                     await CardVerificationRequested(callSid);
                 }
             };
+
+            callForm.FormClosed += (_, __) =>
+            {
+                activeCallControl = null;
+                activeCallForm = null;
+            };
+
+            callForm.Show(this);
+            callForm.BringToFront();
+            callForm.Activate();
         }
 
         /// <summary>
@@ -266,9 +283,32 @@ namespace AgentView
         /// </summary>
         public void ClearActiveCall()
         {
-            PanelActiveCall.Controls.Clear();
-            PanelActiveCall.Visible = false;
+            var form = activeCallForm;
+
+            activeCallForm = null;
             activeCallControl = null;
+            PanelActiveCall.Visible = false;
+
+            if (form != null && !form.IsDisposed)
+            {
+                form.Close();
+            }
+        }
+
+        public void ShowTranscript(string callSid, string text, bool isFinal)
+        {
+            if (activeCallForm != null && activeCallForm.CallControl.CallSid == callSid)
+            {
+                activeCallForm.ShowTranscript(text, isFinal);
+            }
+        }
+
+        public void ShowSentiment(string callSid, double score, string label)
+        {
+            if (activeCallForm != null && activeCallForm.CallControl.CallSid == callSid)
+            {
+                activeCallForm.ShowSentiment(score, label);
+            }
         }
 
         /// <summary>
@@ -306,8 +346,13 @@ namespace AgentView
 
             if (activeCallControl != null)
             {
-                PanelActiveCall.Visible = true;
                 PanelIncomingCalls.Visible = false;
+
+                if (activeCallForm != null && !activeCallForm.IsDisposed)
+                {
+                    activeCallForm.BringToFront();
+                }
+
                 return;
             }
 

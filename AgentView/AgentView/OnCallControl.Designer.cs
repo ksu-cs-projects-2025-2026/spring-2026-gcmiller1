@@ -47,7 +47,7 @@
             label_Timer.Font = new Font("Figtree", 14.25F, FontStyle.Regular, GraphicsUnit.Point, 0);
             label_Timer.Location = new Point(0, 68);
             label_Timer.Name = "label_Timer";
-            label_Timer.Size = new Size(558, 30);
+            label_Timer.Size = new Size(311, 30);
             label_Timer.TabIndex = 0;
             label_Timer.Text = "00:00";
             label_Timer.TextAlign = ContentAlignment.MiddleCenter;
@@ -59,7 +59,7 @@
             label_FromNumber.Location = new Point(0, 0);
             label_FromNumber.Name = "label_FromNumber";
             label_FromNumber.Padding = new Padding(0, 30, 0, 0);
-            label_FromNumber.Size = new Size(558, 68);
+            label_FromNumber.Size = new Size(311, 68);
             label_FromNumber.TabIndex = 1;
             label_FromNumber.Text = "label1";
             label_FromNumber.TextAlign = ContentAlignment.MiddleCenter;
@@ -71,7 +71,7 @@
             btn_EndCall.BackgroundImageLayout = ImageLayout.Zoom;
             btn_EndCall.FlatAppearance.BorderSize = 0;
             btn_EndCall.FlatStyle = FlatStyle.Flat;
-            btn_EndCall.Location = new Point(242, 268);
+            btn_EndCall.Location = new Point(108, 308);
             btn_EndCall.Name = "btn_EndCall";
             btn_EndCall.Padding = new Padding(0, 10, 0, 0);
             btn_EndCall.Size = new Size(80, 80);
@@ -86,7 +86,7 @@
             btn_MuteMic.BackgroundImage = Properties.Resources.microphone_105;
             btn_MuteMic.BackgroundImageLayout = ImageLayout.Stretch;
             btn_MuteMic.FlatStyle = FlatStyle.Flat;
-            btn_MuteMic.Location = new Point(328, 268);
+            btn_MuteMic.Location = new Point(194, 308);
             btn_MuteMic.Name = "btn_MuteMic";
             btn_MuteMic.Size = new Size(80, 80);
             btn_MuteMic.TabIndex = 3;
@@ -100,7 +100,7 @@
             btn_DTMF.BackgroundImageLayout = ImageLayout.Stretch;
             btn_DTMF.FlatAppearance.BorderSize = 0;
             btn_DTMF.FlatStyle = FlatStyle.Flat;
-            btn_DTMF.Location = new Point(156, 268);
+            btn_DTMF.Location = new Point(22, 308);
             btn_DTMF.Name = "btn_DTMF";
             btn_DTMF.Size = new Size(80, 80);
             btn_DTMF.TabIndex = 4;
@@ -114,7 +114,7 @@
             btn_Hold.BackgroundImageLayout = ImageLayout.Stretch;
             btn_Hold.FlatAppearance.BorderSize = 0;
             btn_Hold.FlatStyle = FlatStyle.Flat;
-            btn_Hold.Location = new Point(242, 182);
+            btn_Hold.Location = new Point(108, 222);
             btn_Hold.Name = "btn_Hold";
             btn_Hold.Size = new Size(80, 80);
             btn_Hold.TabIndex = 5;
@@ -125,7 +125,7 @@
             // 
             btn_CardVerify.BackgroundImage = (Image)resources.GetObject("btn_CardVerify.BackgroundImage");
             btn_CardVerify.BackgroundImageLayout = ImageLayout.Stretch;
-            btn_CardVerify.Location = new Point(328, 182);
+            btn_CardVerify.Location = new Point(194, 222);
             btn_CardVerify.Name = "btn_CardVerify";
             btn_CardVerify.Size = new Size(80, 80);
             btn_CardVerify.TabIndex = 6;
@@ -138,7 +138,7 @@
             lb_VerifyResult.Font = new Font("Figtree", 14.25F, FontStyle.Regular, GraphicsUnit.Point, 0);
             lb_VerifyResult.Location = new Point(0, 98);
             lb_VerifyResult.Name = "lb_VerifyResult";
-            lb_VerifyResult.Size = new Size(558, 30);
+            lb_VerifyResult.Size = new Size(311, 30);
             lb_VerifyResult.TabIndex = 7;
             lb_VerifyResult.TextAlign = ContentAlignment.MiddleCenter;
             // 
@@ -155,7 +155,8 @@
             Controls.Add(label_Timer);
             Controls.Add(label_FromNumber);
             Name = "OnCallControl";
-            Size = new Size(558, 456);
+            Size = new Size(311, 450);
+            Load += OnCallControl_Load;
             ResumeLayout(false);
         }
 

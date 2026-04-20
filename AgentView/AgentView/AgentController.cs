@@ -201,6 +201,30 @@ namespace AgentView
                         });
                     }
 
+                    if (evt == "transcriptUpdate")
+                    {
+                        var callSid = doc.RootElement.GetProperty("CallSid").GetString();
+                        var text = doc.RootElement.GetProperty("Text").GetString();
+                        var isFinal = doc.RootElement.GetProperty("IsFinal").GetBoolean();
+                        Console.WriteLine($"transcriptUpdate received: callSid={callSid}, text='{text}', isFinal={isFinal}");
+                        view.Invoke(() =>
+                        {
+                            view.ShowTranscript(callSid, text, isFinal);
+                        });
+                    }
+
+                    if (evt == "sentimentUpdate")
+                    {
+                        var callSid = doc.RootElement.GetProperty("CallSid").GetString();
+                        var score = doc.RootElement.GetProperty("Score").GetDouble();
+                        var label = doc.RootElement.GetProperty("Label").GetString();
+
+                        view.Invoke(() =>
+                        {
+                            view.ShowSentiment(callSid, score, label);
+                        });
+                    }
+
                     await Task.CompletedTask;
                 },
                 async binary =>

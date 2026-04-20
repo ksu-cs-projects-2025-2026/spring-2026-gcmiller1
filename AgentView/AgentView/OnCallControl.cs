@@ -113,12 +113,19 @@ namespace AgentView
             if (success)
             {
                 lb_VerifyResult.Text = "Card Verified";
-                btn_CardVerify.Enabled = true;
             }
             else
             {
                 lb_VerifyResult.Text = "Card Invalid";
             }
+
+            btn_CardVerify.Enabled = true;
+            IsVerifyingCard = false;
+        }
+
+        private void OnCallControl_Load(object sender, EventArgs e)
+        {
+
         }
     }
 }
