@@ -6,6 +6,9 @@ using System.Net.WebSockets;
 using System.Text.Json;
 using Vosk;
 using NAudio.Codecs;
+using NAudio.Wave;
+using NAudio.Wave.SampleProviders;
+using VaderSharp2;
 using System.Collections.Concurrent;
 using Twilio;
 using Twilio.Rest.Api.V2010.Account;
@@ -52,6 +55,8 @@ var recognizers = new ConcurrentDictionary<string, VoskRecognizer>();
 
 var partialTranscriptCache = new ConcurrentDictionary<string, string>();
 
+var sentimentHistory = new ConcurrentDictionary<string, List<double>>();
+
 // Method to clean up calls that have ended
 async Task BroadcastCallEnded(string callSid)
 {
@@ -73,6 +78,7 @@ async Task BroadcastCallEnded(string callSid)
         rec.Dispose();
     }
     partialTranscriptCache.TryRemove(callSid, out _);
+    sentimentHistory.TryRemove(callSid, out _);
     twilioStreams.TryRemove(callSid, out _);
     callToStreamSid.TryRemove(callSid, out _);
     activeCalls.TryRemove(callSid, out _);
@@ -95,6 +101,7 @@ var modelPath = Path.Combine(
 );
 
 var voskModel = new Model(modelPath);
+var sentimentAnalyzer = new SentimentIntensityAnalyzer();
 
 // Default route
 app.MapGet("/", () => "Hello World.");
@@ -226,7 +233,7 @@ app.MapGet("/stream", async (HttpContext context) =>
                         .GetString();
                     twilioStreams[callSid] = ws;
                     callToStreamSid[callSid] = streamSid;
-                    var rec = new VoskRecognizer(voskModel, 8000.0f);
+                    var rec = new VoskRecognizer(voskModel, 16000.0f);
                     rec.SetWords(true);
                     rec.SetMaxAlternatives(0);
 
@@ -258,9 +265,8 @@ app.MapGet("/stream", async (HttpContext context) =>
 
                         if (callSid != null && recognizers.TryGetValue(callSid, out var rec))
                         {
-                            var pcm16 = MuLawToPcm16(audioBytes);
-
-                            bool completedSegment = rec.AcceptWaveform(pcm16, pcm16.Length);
+                            var pcm16k = MuLaw8kToPcm16k(audioBytes);
+                            bool completedSegment = rec.AcceptWaveform(pcm16k, pcm16k.Length);
 
                             if (completedSegment)
                             {
@@ -270,6 +276,12 @@ app.MapGet("/stream", async (HttpContext context) =>
                                 partialTranscriptCache[callSid] = "";
 
                                 await SendTranscriptUpdate(callSid, finalText, true);
+
+                                if (!string.IsNullOrWhiteSpace(finalText))
+                                {
+                                    var (avgScore, label) = UpdateSentimentState(callSid, finalText);
+                                    await SendSentimentUpdate(callSid, avgScore, label);
+                                }
                             }
                             else
                             {
@@ -349,7 +361,11 @@ app.MapGet("/stream", async (HttpContext context) =>
 
                         await SendTranscriptUpdate(callSid, finalText, true);
 
-                        rec.Dispose();
+                        if (!string.IsNullOrWhiteSpace(finalText))
+                        {
+                            var (avgScore, label) = UpdateSentimentState(callSid, finalText);
+                            await SendSentimentUpdate(callSid, avgScore, label);
+                        }
                     }
 
                     partialTranscriptCache.TryRemove(callSid, out _);
@@ -417,133 +433,136 @@ app.MapGet("/agent", async (HttpContext context) =>
 
             }
 
-            if (doc.RootElement.TryGetProperty("Action", out var actionProp) && actionProp.GetString() == "redirectDTMF")
+            if (doc.RootElement.TryGetProperty("Action", out var actionProp))
             {
-                var callSid = doc.RootElement.GetProperty("CallSid").GetString();
-                Console.WriteLine($"Redirect request from WinForm for CallSid {callSid}");
-                CallResource.Update(
-                    pathSid: callSid,
-                    url: new Uri($"https://uncoquettishly-bilgiest-bronson.ngrok-free.dev/dtmf"),
-                    method: Twilio.Http.HttpMethod.Post,
-                    statusCallback: new Uri($"https://{context.Request.Host}/status"),
-                    statusCallbackMethod: Twilio.Http.HttpMethod.Post
-                );
+                var action = actionProp.GetString();
+                if (action == "redirectDTMF")
+                {
+                    var callSid = doc.RootElement.GetProperty("CallSid").GetString();
+                    Console.WriteLine($"Redirect request from WinForm for CallSid {callSid}");
+                    CallResource.Update(
+                        pathSid: callSid,
+                        url: new Uri($"https://uncoquettishly-bilgiest-bronson.ngrok-free.dev/dtmf"),
+                        method: Twilio.Http.HttpMethod.Post,
+                        statusCallback: new Uri($"https://{context.Request.Host}/status"),
+                        statusCallbackMethod: Twilio.Http.HttpMethod.Post
+                    );
 
-                callState[callSid] = "redirecting";
-                Console.WriteLine($"Call {callSid} redirected to /dtmf");
-            }
-
-            if (actionProp.GetString() == "acceptCall")
-            {
-                var callSid = doc.RootElement.GetProperty("CallSid").GetString();
-                Console.WriteLine($"agent {agentId} accepted call for CallSid {callSid}");
-                CallResource.Update(
-                    pathSid: callSid,
-                    url: new Uri($"https://uncoquettishly-bilgiest-bronson.ngrok-free.dev/connect"),
-                    method: Twilio.Http.HttpMethod.Post,
-                    statusCallback: new Uri($"https://{context.Request.Host}/status"),
-                    statusCallbackMethod: Twilio.Http.HttpMethod.Post
-                );
-                callState[callSid] = "connected";
-                callToAgent[callSid] = agentId;
-                cardVerificationActive[callSid] = false;
-                cardDigitBuffer[callSid] = new StringBuilder();
-                var startMsg = JsonSerializer.Serialize(
-                    new
+                    callState[callSid] = "redirecting";
+                    Console.WriteLine($"Call {callSid} redirected to /dtmf");
+                }
+                if (actionProp.GetString() == "acceptCall")
+                {
+                    var callSid = doc.RootElement.GetProperty("CallSid").GetString();
+                    Console.WriteLine($"agent {agentId} accepted call for CallSid {callSid}");
+                    CallResource.Update(
+                        pathSid: callSid,
+                        url: new Uri($"https://uncoquettishly-bilgiest-bronson.ngrok-free.dev/connect"),
+                        method: Twilio.Http.HttpMethod.Post,
+                        statusCallback: new Uri($"https://{context.Request.Host}/status"),
+                        statusCallbackMethod: Twilio.Http.HttpMethod.Post
+                    );
+                    callState[callSid] = "connected";
+                    callToAgent[callSid] = agentId;
+                    cardVerificationActive[callSid] = false;
+                    cardDigitBuffer[callSid] = new StringBuilder();
+                    var startMsg = JsonSerializer.Serialize(
+                        new
+                        {
+                            @event = "start",
+                            CallSid = callSid
+                        });
+                    await ws.SendAsync(Encoding.UTF8.GetBytes(startMsg), WebSocketMessageType.Text, true, CancellationToken.None);
+                    var answeredMsg = JsonSerializer.Serialize(new
                     {
-                        @event = "start",
+                        @event = "callAnswered",
                         CallSid = callSid
                     });
-                await ws.SendAsync(Encoding.UTF8.GetBytes(startMsg), WebSocketMessageType.Text, true, CancellationToken.None);
-                var answeredMsg = JsonSerializer.Serialize(new
-                {
-                    @event = "callAnswered",
-                    CallSid = callSid
-                });
 
-                // Notify all other agents that the call has been answered
-                foreach (var agent in agentSockets)
-                {
-                    if (agent.Key != agentId && agent.Value.State == WebSocketState.Open)
+                    // Notify all other agents that the call has been answered
+                    foreach (var agent in agentSockets)
                     {
-                        await agent.Value.SendAsync(Encoding.UTF8.GetBytes(answeredMsg), WebSocketMessageType.Text, true, CancellationToken.None);
+                        if (agent.Key != agentId && agent.Value.State == WebSocketState.Open)
+                        {
+                            await agent.Value.SendAsync(Encoding.UTF8.GetBytes(answeredMsg), WebSocketMessageType.Text, true, CancellationToken.None);
+                        }
                     }
                 }
-            }
 
-            if (actionProp.GetString() == "startCardVerification")
-            {
-                var callSid = doc.RootElement.GetProperty("CallSid").GetString();
-
-                if (callToAgent.TryGetValue(callSid, out var assignedAgent) && assignedAgent == agentId)
+                if (actionProp.GetString() == "startCardVerification")
                 {
-                    cardVerificationActive[callSid] = true;
-                    cardDigitBuffer[callSid] = new StringBuilder();
+                    var callSid = doc.RootElement.GetProperty("CallSid").GetString();
 
-                    Console.WriteLine($"Card verification started for call {callSid}");
-
-                    var msg = JsonSerializer.Serialize(new
+                    if (callToAgent.TryGetValue(callSid, out var assignedAgent) && assignedAgent == agentId)
                     {
-                        @event = "verificationStarted",
-                        CallSid = callSid
-                    });
+                        cardVerificationActive[callSid] = true;
+                        cardDigitBuffer[callSid] = new StringBuilder();
 
-                    await ws.SendAsync(Encoding.UTF8.GetBytes(msg), WebSocketMessageType.Text, true, CancellationToken.None);
+                        Console.WriteLine($"Card verification started for call {callSid}");
+
+                        var msg = JsonSerializer.Serialize(new
+                        {
+                            @event = "verificationStarted",
+                            CallSid = callSid
+                        });
+
+                        await ws.SendAsync(Encoding.UTF8.GetBytes(msg), WebSocketMessageType.Text, true, CancellationToken.None);
+                    }
                 }
-            }
 
-            if (actionProp.GetString() == "putOnHold")
-            {
-                var callSid = doc.RootElement.GetProperty("CallSid").GetString();
-                Console.WriteLine($"Putting call {callSid} on hold");
+                if (actionProp.GetString() == "putOnHold")
+                {
+                    var callSid = doc.RootElement.GetProperty("CallSid").GetString();
+                    Console.WriteLine($"Putting call {callSid} on hold");
 
-                CallResource.Update(
-                    pathSid: callSid,
-                    url: new Uri($"https://{context.Request.Host}/hold"),
-                    method: Twilio.Http.HttpMethod.Post,
-                    statusCallback: new Uri($"https://{context.Request.Host}/status"),
-                    statusCallbackMethod: Twilio.Http.HttpMethod.Post
-                );
+                    CallResource.Update(
+                        pathSid: callSid,
+                        url: new Uri($"https://{context.Request.Host}/hold"),
+                        method: Twilio.Http.HttpMethod.Post,
+                        statusCallback: new Uri($"https://{context.Request.Host}/status"),
+                        statusCallbackMethod: Twilio.Http.HttpMethod.Post
+                    );
 
-                callState[callSid] = "hold";
-            }
+                    callState[callSid] = "hold";
+                }
 
-            if (actionProp.GetString() == "takeOffHold")
-            {
-                var callSid = doc.RootElement.GetProperty("CallSid").GetString();
-                Console.WriteLine($"Taking call {callSid} off hold");
+                if (actionProp.GetString() == "takeOffHold")
+                {
+                    var callSid = doc.RootElement.GetProperty("CallSid").GetString();
+                    Console.WriteLine($"Taking call {callSid} off hold");
 
-                CallResource.Update(
-                    pathSid: callSid,
-                    url: new Uri($"https://{context.Request.Host}/connect"),
-                    method: Twilio.Http.HttpMethod.Post,
-                    statusCallback: new Uri($"https://{context.Request.Host}/status"),
-                    statusCallbackMethod: Twilio.Http.HttpMethod.Post
-                );
+                    CallResource.Update(
+                        pathSid: callSid,
+                        url: new Uri($"https://{context.Request.Host}/connect"),
+                        method: Twilio.Http.HttpMethod.Post,
+                        statusCallback: new Uri($"https://{context.Request.Host}/status"),
+                        statusCallbackMethod: Twilio.Http.HttpMethod.Post
+                    );
 
-                callState[callSid] = "connected";
-            }
+                    callState[callSid] = "connected";
+                }
 
-            if (actionProp.GetString() == "endCall")
-            {
-                var callSid = doc.RootElement.GetProperty("CallSid").GetString();
-                Console.WriteLine($"Agent requested endCall for {callSid}");
-                callState[callSid] = "agent_hangup";
+                if (actionProp.GetString() == "endCall")
+                {
+                    var callSid = doc.RootElement.GetProperty("CallSid").GetString();
+                    Console.WriteLine($"Agent requested endCall for {callSid}");
+                    callState[callSid] = "agent_hangup";
 
-                // Hang up call via Twilio
-                CallResource.Update(
-                    pathSid: callSid,
-                    status: CallResource.UpdateStatusEnum.Completed
-                );
+                    // Hang up call via Twilio
+                    CallResource.Update(
+                        pathSid: callSid,
+                        status: CallResource.UpdateStatusEnum.Completed
+                    );
 
-                // cleanup
-                twilioStreams.TryRemove(callSid, out _);
-                callToStreamSid.TryRemove(callSid, out _);
-                activeCalls.TryRemove(callSid, out _);
-                callState.TryRemove(callSid, out _);
-                callToAgent.TryRemove(callSid, out _);
-                cardVerificationActive.TryRemove(callSid, out _);
-                cardDigitBuffer.TryRemove(callSid, out _);
+                    // cleanup
+                    twilioStreams.TryRemove(callSid, out _);
+                    callToStreamSid.TryRemove(callSid, out _);
+                    activeCalls.TryRemove(callSid, out _);
+                    callState.TryRemove(callSid, out _);
+                    callToAgent.TryRemove(callSid, out _);
+                    cardVerificationActive.TryRemove(callSid, out _);
+                    cardDigitBuffer.TryRemove(callSid, out _);
+                }
             }
         }
         catch
@@ -630,8 +649,39 @@ static byte[] MuLawToPcm16(byte[] muLawBytes)
     return pcmBuffer;
 }
 
+static byte[] MuLaw8kToPcm16k(byte[] muLawBytes)
+{
+    var pcm8k = new byte[muLawBytes.Length * 2];
+
+    for (int i = 0; i < muLawBytes.Length; i++)
+    {
+        short pcm = MuLawDecoder.MuLawToLinearSample(muLawBytes[i]);
+        pcm8k[i * 2] = (byte)(pcm & 0xff);
+        pcm8k[i * 2 + 1] = (byte)((pcm >> 8) & 0xff);
+    }
+
+    using var sourceStream = new RawSourceWaveStream(
+        pcm8k,
+        0,
+        pcm8k.Length,
+        new WaveFormat(8000, 16, 1));
+
+    var sampleProvider = sourceStream.ToSampleProvider();
+    var resampled = new WdlResamplingSampleProvider(sampleProvider, 16000);
+
+    using var outStream = new MemoryStream();
+    WaveFileWriter.WriteWavFileToStream(outStream, resampled.ToWaveProvider16());
+
+    var wavBytes = outStream.ToArray();
+    var rawPcm16k = new byte[wavBytes.Length - 44];
+    Buffer.BlockCopy(wavBytes, 44, rawPcm16k, 0, rawPcm16k.Length);
+
+    return rawPcm16k;
+}
+
 async Task SendTranscriptUpdate(string callSid, string text, bool isFinal)
 {
+    Console.WriteLine($"SendTranscriptUpdate: callSid={callSid}, text='{text}', isFinal={isFinal}");
     if (string.IsNullOrWhiteSpace(text))
     {
         return;
@@ -699,6 +749,66 @@ static string ExtractPartialTranscriptText(string voskJson)
     }
 
     return "";
+}
+
+static string GetSentimentLabel(double compound)
+{
+    if (compound >= 0.05)
+    {
+        return "Positive";
+    }
+
+    if (compound <= -0.05)
+    {
+        return "Negative";
+    }
+
+    return "Neutral";
+}
+
+(double averageScore, string label) UpdateSentimentState(string callSid, string text)
+{
+    var scores = sentimentAnalyzer.PolarityScores(text);
+    double compound = scores.Compound;
+
+    var history = sentimentHistory.GetOrAdd(callSid, _ => new List<double>());
+
+    lock (history)
+    {
+        history.Add(compound);
+
+        if (history.Count > 10)
+        {
+            history.RemoveAt(0);
+        }
+
+        double average = history.Average();
+        string label = GetSentimentLabel(average);
+
+        return (average, label);
+    }
+}
+
+async Task SendSentimentUpdate(string callSid, double score, string label)
+{
+    if (callToAgent.TryGetValue(callSid, out var assignedAgentId) &&
+        agentSockets.TryGetValue(assignedAgentId, out var agentWs) &&
+        agentWs.State == WebSocketState.Open)
+    {
+        var msg = JsonSerializer.Serialize(new
+        {
+            @event = "sentimentUpdate",
+            CallSid = callSid,
+            Score = score,
+            Label = label
+        });
+
+        await agentWs.SendAsync(
+            Encoding.UTF8.GetBytes(msg),
+            WebSocketMessageType.Text,
+            true,
+            CancellationToken.None);
+    }
 }
 
 app.Run();
