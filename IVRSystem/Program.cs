@@ -4,6 +4,8 @@ using Twilio.TwiML;
 using Twilio.TwiML.Voice;
 using System.Net.WebSockets;
 using System.Text.Json;
+using Vosk;
+using NAudio.Codecs;
 using System.Collections.Concurrent;
 using Twilio;
 using Twilio.Rest.Api.V2010.Account;
@@ -46,6 +48,9 @@ var cardVerificationActive = new ConcurrentDictionary<string, bool>();
 
 var cardDigitBuffer = new ConcurrentDictionary<string, StringBuilder>();
 
+var recognizers = new ConcurrentDictionary<string, VoskRecognizer>();
+
+var partialTranscriptCache = new ConcurrentDictionary<string, string>();
 
 // Method to clean up calls that have ended
 async Task BroadcastCallEnded(string callSid)
@@ -63,7 +68,11 @@ async Task BroadcastCallEnded(string callSid)
             await agent.SendAsync(Encoding.UTF8.GetBytes(msg), WebSocketMessageType.Text, true, CancellationToken.None);
         }
     }
-
+    if (recognizers.TryRemove(callSid, out var rec))
+    {
+        rec.Dispose();
+    }
+    partialTranscriptCache.TryRemove(callSid, out _);
     twilioStreams.TryRemove(callSid, out _);
     callToStreamSid.TryRemove(callSid, out _);
     activeCalls.TryRemove(callSid, out _);
@@ -77,6 +86,15 @@ var app = builder.Build();
 app.UseForwardedHeaders();
 app.UseWebSockets();
 app.UseStaticFiles();
+
+Vosk.Vosk.SetLogLevel(0);
+var modelPath = Path.Combine(
+    AppContext.BaseDirectory,
+    "model",
+    "vosk-model-small-en-us-0.15"
+);
+
+var voskModel = new Model(modelPath);
 
 // Default route
 app.MapGet("/", () => "Hello World.");
@@ -208,6 +226,12 @@ app.MapGet("/stream", async (HttpContext context) =>
                         .GetString();
                     twilioStreams[callSid] = ws;
                     callToStreamSid[callSid] = streamSid;
+                    var rec = new VoskRecognizer(voskModel, 8000.0f);
+                    rec.SetWords(true);
+                    rec.SetMaxAlternatives(0);
+
+                    recognizers[callSid] = rec;
+                    partialTranscriptCache[callSid] = "";
                     Console.WriteLine($"Twilio stream started for {callSid}");
                 }
                 if (evt == "media")
@@ -231,7 +255,38 @@ app.MapGet("/stream", async (HttpContext context) =>
                                 true,
                                 CancellationToken.None);
                         }
+
+                        if (callSid != null && recognizers.TryGetValue(callSid, out var rec))
+                        {
+                            var pcm16 = MuLawToPcm16(audioBytes);
+
+                            bool completedSegment = rec.AcceptWaveform(pcm16, pcm16.Length);
+
+                            if (completedSegment)
+                            {
+                                var finalJson = rec.Result();
+
+                                string finalText = ExtractTranscriptText(finalJson);
+                                partialTranscriptCache[callSid] = "";
+
+                                await SendTranscriptUpdate(callSid, finalText, true);
+                            }
+                            else
+                            {
+                                var partialJson = rec.PartialResult();
+                                string partialText = ExtractPartialTranscriptText(partialJson);
+
+                                if (!string.IsNullOrWhiteSpace(partialText) &&
+                                    partialTranscriptCache.TryGetValue(callSid, out var lastPartial) &&
+                                    partialText != lastPartial)
+                                {
+                                    partialTranscriptCache[callSid] = partialText;
+                                    await SendTranscriptUpdate(callSid, partialText, false);
+                                }
+                            }
+                        }
                     }
+
                     // Forward to all connected WinForm agents
 
                 }
@@ -286,6 +341,18 @@ app.MapGet("/stream", async (HttpContext context) =>
                 else if (evt == "stop")
                 {
                     Console.WriteLine($"Stream stopped for {callSid}");
+
+                    if (!string.IsNullOrEmpty(callSid) && recognizers.TryRemove(callSid, out var rec))
+                    {
+                        var finalJson = rec.FinalResult();
+                        var finalText = ExtractTranscriptText(finalJson);
+
+                        await SendTranscriptUpdate(callSid, finalText, true);
+
+                        rec.Dispose();
+                    }
+
+                    partialTranscriptCache.TryRemove(callSid, out _);
                 }
 
             }
@@ -525,6 +592,7 @@ app.MapPost("/gather", async (HttpRequest request) =>
     return Results.Text(response.ToString(), "text/xml", Encoding.UTF8);
 });
 
+// Algorithm to check if card number is valid
  static bool LuhnCheck(string cardNumber)
 {
     int sum = 0;
@@ -545,6 +613,92 @@ app.MapPost("/gather", async (HttpRequest request) =>
     }
 
     return (sum % 10 == 0);
+}
+
+
+static byte[] MuLawToPcm16(byte[] muLawBytes)
+{
+    var pcmBuffer = new byte[muLawBytes.Length * 2];
+
+    for (int i = 0; i < muLawBytes.Length; i++)
+    {
+        short pcm = MuLawDecoder.MuLawToLinearSample(muLawBytes[i]);
+        pcmBuffer[i * 2] = (byte)(pcm & 0xff);
+        pcmBuffer[i * 2 + 1] = (byte)((pcm >> 8) & 0xff);
+    }
+
+    return pcmBuffer;
+}
+
+async Task SendTranscriptUpdate(string callSid, string text, bool isFinal)
+{
+    if (string.IsNullOrWhiteSpace(text))
+    {
+        return;
+    }
+
+    if (callToAgent.TryGetValue(callSid, out var assignedAgentId) &&
+        agentSockets.TryGetValue(assignedAgentId, out var agentWs) &&
+        agentWs.State == WebSocketState.Open)
+    {
+        var msg = JsonSerializer.Serialize(new
+        {
+            @event = "transcriptUpdate",
+            CallSid = callSid,
+            Text = text,
+            IsFinal = isFinal
+        });
+
+        await agentWs.SendAsync(
+            Encoding.UTF8.GetBytes(msg),
+            WebSocketMessageType.Text,
+            true,
+            CancellationToken.None);
+    }
+}
+
+static string ExtractTranscriptText(string voskJson)
+{
+    if (string.IsNullOrWhiteSpace(voskJson))
+    {
+        return "";
+    }
+
+    try
+    {
+        using var doc = JsonDocument.Parse(voskJson);
+        if (doc.RootElement.TryGetProperty("text", out var textProp))
+        {
+            return textProp.GetString() ?? "";
+        }
+    }
+    catch
+    {
+    }
+
+    return "";
+}
+
+static string ExtractPartialTranscriptText(string voskJson)
+{
+    if (string.IsNullOrWhiteSpace(voskJson))
+    {
+        return "";
+    }
+
+    try
+    {
+        using var doc = JsonDocument.Parse(voskJson);
+        if (doc.RootElement.TryGetProperty("partial", out var partialProp))
+        {
+            return partialProp.GetString() ?? "";
+        }
+    }
+    catch
+    {
+    }
+
+    return "";
 }
 
 app.Run();
