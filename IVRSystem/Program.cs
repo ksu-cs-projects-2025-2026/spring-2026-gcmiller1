@@ -651,14 +651,7 @@ static byte[] MuLawToPcm16(byte[] muLawBytes)
 
 static byte[] MuLaw8kToPcm16k(byte[] muLawBytes)
 {
-    var pcm8k = new byte[muLawBytes.Length * 2];
-
-    for (int i = 0; i < muLawBytes.Length; i++)
-    {
-        short pcm = MuLawDecoder.MuLawToLinearSample(muLawBytes[i]);
-        pcm8k[i * 2] = (byte)(pcm & 0xff);
-        pcm8k[i * 2 + 1] = (byte)((pcm >> 8) & 0xff);
-    }
+    byte[] pcm8k = MuLawToPcm16(muLawBytes);
 
     using var sourceStream = new RawSourceWaveStream(
         pcm8k,
@@ -666,17 +659,24 @@ static byte[] MuLaw8kToPcm16k(byte[] muLawBytes)
         pcm8k.Length,
         new WaveFormat(8000, 16, 1));
 
-    var sampleProvider = sourceStream.ToSampleProvider();
-    var resampled = new WdlResamplingSampleProvider(sampleProvider, 16000);
+    using var resampler = new MediaFoundationResampler(
+        sourceStream,
+        new WaveFormat(16000, 16, 1))
+    {
+        ResamplerQuality = 60
+    };
 
-    using var outStream = new MemoryStream();
-    WaveFileWriter.WriteWavFileToStream(outStream, resampled.ToWaveProvider16());
+    using var output = new MemoryStream();
 
-    var wavBytes = outStream.ToArray();
-    var rawPcm16k = new byte[wavBytes.Length - 44];
-    Buffer.BlockCopy(wavBytes, 44, rawPcm16k, 0, rawPcm16k.Length);
+    byte[] buffer = new byte[4096];
+    int bytesRead;
 
-    return rawPcm16k;
+    while ((bytesRead = resampler.Read(buffer, 0, buffer.Length)) > 0)
+    {
+        output.Write(buffer, 0, bytesRead);
+    }
+
+    return output.ToArray();
 }
 
 async Task SendTranscriptUpdate(string callSid, string text, bool isFinal)

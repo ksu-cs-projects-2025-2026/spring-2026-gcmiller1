@@ -21,6 +21,7 @@ namespace AgentView
         private DateTime callEndTime;
         private double latestCallSentiment;
         private string activeFromNumber;
+        private bool cardVerified;
 
         private string currentCallSid;
         private bool hold;
@@ -190,6 +191,11 @@ namespace AgentView
                         var callSid = doc.RootElement.GetProperty("CallSid").GetString();
                         var success = doc.RootElement.GetProperty("Success").GetBoolean();
 
+                        if (callSid == currentCallSid && success)
+                        {
+                            cardVerified = true;
+                        }
+
                         view.Invoke(() =>
                         {
                             view.ShowVerificationResult(callSid, success);
@@ -248,14 +254,14 @@ namespace AgentView
         private void SaveCallSummary()
         {
             callEndTime = DateTime.Now;
-
             var summary = new CallSummary
             {
                 FromNumber = activeFromNumber,
                 CallStartTime = callStartTime.ToString("yyyy-MM-dd HH:mm:ss"),
                 CallEndTime = callEndTime.ToString("yyyy-MM-dd HH:mm:ss"),
                 CallLength = (callEndTime - callStartTime).ToString(@"hh\:mm\:ss"),
-                CallSentiment = latestCallSentiment
+                CallSentiment = latestCallSentiment,
+                CardVerified = cardVerified
             };
 
             var filePath = Path.Combine(
@@ -309,6 +315,7 @@ namespace AgentView
             activeFromNumber = fromNumber;
             callStartTime = DateTime.Now;
             latestCallSentiment = 0.0;
+            cardVerified = false;
 
             await commService.SendJsonAsync(new
             {

@@ -447,6 +447,18 @@ namespace AgentView
 
             var json = File.ReadAllText(filePath);
 
+            if (string.IsNullOrWhiteSpace(json))
+            {
+                PanelIncomingCalls.Controls.Add(new Label
+                {
+                    Text = "No call history found.",
+                    Dock = DockStyle.Top,
+                    Height = 40
+                });
+
+                return;
+            }
+
             List<CallSummary> summaries;
 
             if (json.TrimStart().StartsWith("["))
@@ -464,7 +476,7 @@ namespace AgentView
                 var label = new Label
                 {
                     AutoSize = false,
-                    Height = 90,
+                    Height = 110,
                     Dock = DockStyle.Top,
                     Padding = new Padding(10),
                     BorderStyle = BorderStyle.FixedSingle,
@@ -472,7 +484,8 @@ namespace AgentView
                         $"From: {summary.FromNumber}{Environment.NewLine}" +
                         $"Start: {summary.CallStartTime}{Environment.NewLine}" +
                         $"Length: {summary.CallLength}{Environment.NewLine}" +
-                        $"Sentiment: {summary.CallSentiment:F2}"
+                        $"Sentiment: {summary.CallSentiment:F2}{Environment.NewLine}" +
+                        $"Card Verified: {(summary.CardVerified ? "Yes" : "No")}"
                 };
 
                 PanelIncomingCalls.Controls.Add(label);

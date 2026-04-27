@@ -17,5 +17,7 @@ namespace AgentView
         public string CallLength { get; set; }
 
         public double CallSentiment { get; set; }
+
+        public bool CardVerified { get; set; }
     }
 }
