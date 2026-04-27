@@ -101,7 +101,15 @@ namespace AgentView
         {
             if (!IsVerifyingCard)
             {
+                BeginCardVerification();
                 VerifyCardRequested?.Invoke(this, EventArgs.Empty);
+            }
+        }
+
+        public void BeginCardVerification()
+        {
+            if (!IsVerifyingCard)
+            {
                 lb_VerifyResult.Text = "Waiting for input...";
                 btn_CardVerify.Enabled = false;
                 IsVerifyingCard = true;

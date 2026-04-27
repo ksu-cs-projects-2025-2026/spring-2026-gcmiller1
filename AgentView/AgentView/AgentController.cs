@@ -186,6 +186,16 @@ namespace AgentView
                         });
                     }
 
+                    if (evt == "verificationStarted")
+                    {
+                        var callSid = doc.RootElement.GetProperty("CallSid").GetString();
+
+                        view.Invoke(() =>
+                        {
+                            view.ShowVerificationStarted(callSid);
+                        });
+                    }
+
                     if (evt == "cardVerificationResult")
                     {
                         var callSid = doc.RootElement.GetProperty("CallSid").GetString();

@@ -304,50 +304,83 @@ app.MapGet("/stream", async (HttpContext context) =>
                 }
                 else if (evt == "dtmf")
                 {
-                    var digit = doc.RootElement.GetProperty("dtmf").GetProperty("digit").GetString();
+                    var digit = doc.RootElement
+                        .GetProperty("dtmf")
+                        .GetProperty("digit")
+                        .GetString();
 
-                    if (!string.IsNullOrEmpty(callSid) &&
-                        cardVerificationActive.TryGetValue(callSid, out bool isActive) &&
-                        isActive)
+                    if (string.IsNullOrEmpty(callSid) || string.IsNullOrEmpty(digit))
                     {
-                        if (!string.IsNullOrEmpty(digit))
+                        incomingData.Clear();
+                        continue;
+                    }
+
+                    Console.WriteLine($"DTMF on {callSid}: {digit}");
+
+                    if (digit == "*")
+                    {
+                        cardVerificationActive[callSid] = true;
+                        cardDigitBuffer[callSid] = new StringBuilder();
+
+                        if (callToAgent.TryGetValue(callSid, out var assignedAgent) &&
+                            agentSockets.TryGetValue(assignedAgent, out var agentWs) &&
+                            agentWs.State == WebSocketState.Open)
                         {
-                            Console.WriteLine($"DTMF for verification on {callSid}: {digit}");
-
-                            var cardbuffer = cardDigitBuffer.GetOrAdd(callSid, _ => new StringBuilder());
-
-                            if (digit == "#")
+                            var startMsg = JsonSerializer.Serialize(new
                             {
-                                var cardNumber = cardbuffer.ToString();
-                                cardbuffer.Clear();
-                                cardVerificationActive[callSid] = false;
+                                @event = "verificationStarted",
+                                CallSid = callSid
+                            });
 
-                                bool validLength = cardNumber.Length >= 13 && cardNumber.Length <= 19;
-                                bool isValid = validLength && LuhnCheck(cardNumber);
-
-                                if (callToAgent.TryGetValue(callSid, out var assignedAgent) &&
-                                    agentSockets.TryGetValue(assignedAgent, out var agentWs) &&
-                                    agentWs.State == WebSocketState.Open)
-                                {
-                                    var resultMsg = JsonSerializer.Serialize(new
-                                    {
-                                        @event = "cardVerificationResult",
-                                        CallSid = callSid,
-                                        Success = isValid
-                                    });
-
-                                    await agentWs.SendAsync(
-                                        Encoding.UTF8.GetBytes(resultMsg),
-                                        WebSocketMessageType.Text,
-                                        true,
-                                        CancellationToken.None);
-                                }
-                            }
-                            else if (char.IsDigit(digit[0]))
-                            {
-                                cardbuffer.Append(digit);
-                            }
+                            await agentWs.SendAsync(
+                                Encoding.UTF8.GetBytes(startMsg),
+                                WebSocketMessageType.Text,
+                                true,
+                                CancellationToken.None);
                         }
+
+                        incomingData.Clear();
+                        continue;
+                    }
+
+                    if (!cardVerificationActive.TryGetValue(callSid, out bool isActive) || !isActive)
+                    {
+                        incomingData.Clear();
+                        continue;
+                    }
+
+                    var cardbuffer = cardDigitBuffer.GetOrAdd(callSid, _ => new StringBuilder());
+
+                    if (digit == "#")
+                    {
+                        var cardNumber = cardbuffer.ToString();
+                        cardbuffer.Clear();
+                        cardVerificationActive[callSid] = false;
+
+                        bool validLength = cardNumber.Length >= 13 && cardNumber.Length <= 19;
+                        bool isValid = validLength && LuhnCheck(cardNumber);
+
+                        if (callToAgent.TryGetValue(callSid, out var assignedAgent) &&
+                            agentSockets.TryGetValue(assignedAgent, out var agentWs) &&
+                            agentWs.State == WebSocketState.Open)
+                        {
+                            var resultMsg = JsonSerializer.Serialize(new
+                            {
+                                @event = "cardVerificationResult",
+                                CallSid = callSid,
+                                Success = isValid
+                            });
+
+                            await agentWs.SendAsync(
+                                Encoding.UTF8.GetBytes(resultMsg),
+                                WebSocketMessageType.Text,
+                                true,
+                                CancellationToken.None);
+                        }
+                    }
+                    else if (char.IsDigit(digit[0]))
+                    {
+                        cardbuffer.Append(digit);
                     }
                 }
                 else if (evt == "stop")

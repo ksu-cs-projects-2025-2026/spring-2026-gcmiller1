@@ -99,6 +99,14 @@ namespace AgentView
             }
         }
 
+        public void ShowVerificationStarted(string callSid)
+        {
+            if (activeCallControl != null && activeCallControl.CallSid == callSid)
+            {
+                activeCallControl.BeginCardVerification();
+            }
+        }
+
         /// <summary>
         /// Updates the view for when a call ends
         /// </summary>
