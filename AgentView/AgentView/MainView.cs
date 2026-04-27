@@ -10,8 +10,16 @@ using NAudio.Codecs;
 
 namespace AgentView
 {
+
     public partial class MainView : Form
     {
+        private enum MainContentView
+        {
+            Home,
+            History
+        }
+
+        private MainContentView currentView = MainContentView.Home;
         public event Func<string, string, Task> AcceptCallRequested;
         public event Func<string, Task> EndCallRequested;
         public event Func<string, Task> HoldRequested;
@@ -132,10 +140,13 @@ namespace AgentView
                 }
             };
 
-            PanelIncomingCalls.Controls.Add(ctrl);
-            PanelIncomingCalls.Controls.SetChildIndex(ctrl, 0);
-
             incomingCallRows[callSid] = ctrl;
+
+            if (currentView == MainContentView.Home)
+            {
+                PanelIncomingCalls.Controls.Add(ctrl);
+                PanelIncomingCalls.Controls.SetChildIndex(ctrl, 0);
+            }
         }
 
         /// <summary>
@@ -346,7 +357,10 @@ namespace AgentView
 
             if (activeCallControl != null)
             {
-                PanelIncomingCalls.Visible = false;
+                if (currentView == MainContentView.Home)
+                {
+                    PanelIncomingCalls.Visible = false;
+                }
 
                 if (activeCallForm != null && !activeCallForm.IsDisposed)
                 {
@@ -375,15 +389,105 @@ namespace AgentView
             }
             else
             {
-                PanelIncomingCalls.Visible = false;
+                if (currentView == MainContentView.Home)
+                {
+                    PanelIncomingCalls.Visible = false;
+                }
             }
 
             StatusChanged?.Invoke(status);
         }
 
+        private void ShowHomeView()
+        {
+            currentView = MainContentView.Home;
+
+            PanelIncomingCalls.Controls.Clear();
+            PanelIncomingCalls.Visible = true;
+            PanelActiveCall.Visible = false;
+
+            foreach (var kvp in incomingCallRows)
+            {
+                var ctrl = kvp.Value;
+
+                if (!ctrl.IsDisposed)
+                {
+                    PanelIncomingCalls.Controls.Add(ctrl);
+                    PanelIncomingCalls.Controls.SetChildIndex(ctrl, 0);
+                }
+            }
+
+            FlushPendingCalls();
+        }
+
+        private void ShowHistoryView()
+        {
+            currentView = MainContentView.History;
+
+            PanelIncomingCalls.Controls.Clear();
+            PanelIncomingCalls.Visible = true;
+            PanelActiveCall.Visible = false;
+
+            var filePath = Path.Combine(
+                Directory.GetParent(AppDomain.CurrentDomain.BaseDirectory).Parent.Parent.Parent.FullName,
+                "CallSummary.json"
+            );
+
+            if (!File.Exists(filePath))
+            {
+                PanelIncomingCalls.Controls.Add(new Label
+                {
+                    Text = "No call history found.",
+                    Dock = DockStyle.Top,
+                    Height = 40
+                });
+
+                return;
+            }
+
+            var json = File.ReadAllText(filePath);
+
+            List<CallSummary> summaries;
+
+            if (json.TrimStart().StartsWith("["))
+            {
+                summaries = JsonSerializer.Deserialize<List<CallSummary>>(json) ?? new List<CallSummary>();
+            }
+            else
+            {
+                var singleSummary = JsonSerializer.Deserialize<CallSummary>(json);
+                summaries = singleSummary != null ? new List<CallSummary> { singleSummary } : new List<CallSummary>();
+            }
+
+            foreach (var summary in summaries.AsEnumerable().Reverse())
+            {
+                var label = new Label
+                {
+                    AutoSize = false,
+                    Height = 90,
+                    Dock = DockStyle.Top,
+                    Padding = new Padding(10),
+                    BorderStyle = BorderStyle.FixedSingle,
+                    Text =
+                        $"From: {summary.FromNumber}{Environment.NewLine}" +
+                        $"Start: {summary.CallStartTime}{Environment.NewLine}" +
+                        $"Length: {summary.CallLength}{Environment.NewLine}" +
+                        $"Sentiment: {summary.CallSentiment:F2}"
+                };
+
+                PanelIncomingCalls.Controls.Add(label);
+                PanelIncomingCalls.Controls.SetChildIndex(label, 0);
+            }
+        }
+
         private void btn_History_Click(object sender, EventArgs e)
         {
+            ShowHistoryView();
+        }
 
+        private void btn_Home_Click(object sender, EventArgs e)
+        {
+            ShowHomeView();
         }
     }
 }

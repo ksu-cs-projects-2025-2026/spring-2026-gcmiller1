@@ -8,16 +8,14 @@ namespace AgentView
 {
     public class CallSummary
     {
-        public Contact CallContact { get; set; }
+        public string FromNumber { get; set; }
 
         public string CallStartTime { get; set; }
 
         public string CallEndTime { get; set; }
 
-        public string Notes { get; set; }
-
         public string CallLength { get; set; }
 
-
+        public double CallSentiment { get; set; }
     }
 }

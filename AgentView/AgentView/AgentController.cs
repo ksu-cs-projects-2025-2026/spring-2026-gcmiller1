@@ -1,5 +1,6 @@
 ﻿using NAudio.Codecs;
 using System;
+using System.IO;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -15,6 +16,11 @@ namespace AgentView
         private readonly AudioService audioService;
         private readonly CallManager callManager;
         private readonly Agent agent;
+
+        private DateTime callStartTime;
+        private DateTime callEndTime;
+        private double latestCallSentiment;
+        private string activeFromNumber;
 
         private string currentCallSid;
         private bool hold;
@@ -160,7 +166,7 @@ namespace AgentView
                     {
                         var callSid = doc.RootElement.GetProperty("CallSid").GetString();
                         Console.WriteLine($"Call ended: {callSid}");
-
+                        SaveCallSummary();
                         view.Invoke(() =>
                         {
                             if (view.HasActiveCallControl(callSid) && hold == false)
@@ -219,6 +225,11 @@ namespace AgentView
                         var score = doc.RootElement.GetProperty("Score").GetDouble();
                         var label = doc.RootElement.GetProperty("Label").GetString();
 
+                        if (callSid == currentCallSid)
+                        {
+                            latestCallSentiment = score;
+                        }
+
                         view.Invoke(() =>
                         {
                             view.ShowSentiment(callSid, score, label);
@@ -234,6 +245,58 @@ namespace AgentView
                 });
         }
 
+        private void SaveCallSummary()
+        {
+            callEndTime = DateTime.Now;
+
+            var summary = new CallSummary
+            {
+                FromNumber = activeFromNumber,
+                CallStartTime = callStartTime.ToString("yyyy-MM-dd HH:mm:ss"),
+                CallEndTime = callEndTime.ToString("yyyy-MM-dd HH:mm:ss"),
+                CallLength = (callEndTime - callStartTime).ToString(@"hh\:mm\:ss"),
+                CallSentiment = latestCallSentiment
+            };
+
+            var filePath = Path.Combine(
+                Directory.GetParent(AppDomain.CurrentDomain.BaseDirectory).Parent.Parent.Parent.FullName,
+                "CallSummary.json"
+            );
+
+            List<CallSummary> summaries = new List<CallSummary>();
+
+            if (File.Exists(filePath))
+            {
+                var existingJson = File.ReadAllText(filePath);
+
+                if (!string.IsNullOrWhiteSpace(existingJson))
+                {
+                    if (existingJson.TrimStart().StartsWith("["))
+                    {
+                        summaries = JsonSerializer.Deserialize<List<CallSummary>>(existingJson) ?? new List<CallSummary>();
+                    }
+                    else
+                    {
+                        var existingSummary = JsonSerializer.Deserialize<CallSummary>(existingJson);
+
+                        if (existingSummary != null)
+                        {
+                            summaries.Add(existingSummary);
+                        }
+                    }
+                }
+            }
+
+            summaries.Add(summary);
+
+            var options = new JsonSerializerOptions
+            {
+                WriteIndented = true
+            };
+
+            File.WriteAllText(filePath, JsonSerializer.Serialize(summaries, options));
+        }
+
         /// <summary>
         /// Handles accepting a call.
         /// </summary>
@@ -243,6 +306,9 @@ namespace AgentView
         private async Task AcceptCall(string callSid, string fromNumber)
         {
             currentCallSid = callSid;
+            activeFromNumber = fromNumber;
+            callStartTime = DateTime.Now;
+            latestCallSentiment = 0.0;
 
             await commService.SendJsonAsync(new
             {

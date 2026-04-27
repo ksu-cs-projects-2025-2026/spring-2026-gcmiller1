@@ -98,6 +98,7 @@
             btn_Home.Text = "  Home";
             btn_Home.TextImageRelation = TextImageRelation.ImageBeforeText;
             btn_Home.UseVisualStyleBackColor = true;
+            btn_Home.Click += btn_Home_Click;
             // 
             // btn_History
             // 
