@@ -39,6 +39,7 @@
             btn_Hold = new CircleButton();
             btn_CardVerify = new CircleButton();
             lb_VerifyResult = new Label();
+            this.AutoScaleMode = AutoScaleMode.Dpi;
             SuspendLayout();
             // 
             // label_Timer

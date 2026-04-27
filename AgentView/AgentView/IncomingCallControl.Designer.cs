@@ -30,6 +30,7 @@
         {
             label1 = new Label();
             button1 = new Button();
+            this.AutoScaleMode = AutoScaleMode.Dpi;
             SuspendLayout();
             // 
             // label1

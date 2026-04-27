@@ -13,6 +13,10 @@ namespace AgentView
         {
             ApplicationConfiguration.Initialize();
 
+            Application.SetHighDpiMode(HighDpiMode.PerMonitorV2);
+            Application.EnableVisualStyles();
+            Application.SetCompatibleTextRenderingDefault(false);
+
             var view = new MainView();
             var controller = new AgentController(view);
 

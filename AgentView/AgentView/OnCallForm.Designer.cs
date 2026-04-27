@@ -33,6 +33,7 @@
             // OnCallForm
             // 
             AutoScaleDimensions = new SizeF(7F, 15F);
+            this.AutoScaleMode = AutoScaleMode.Dpi;
             AutoScaleMode = AutoScaleMode.Font;
             ClientSize = new Size(288, 603);
             Name = "OnCallForm";
