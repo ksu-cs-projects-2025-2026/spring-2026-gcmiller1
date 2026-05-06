@@ -39,7 +39,7 @@
             btn_Hold = new CircleButton();
             btn_CardVerify = new CircleButton();
             lb_VerifyResult = new Label();
-            this.AutoScaleMode = AutoScaleMode.Dpi;
+            btn_AddContact = new CircleButton();
             SuspendLayout();
             // 
             // label_Timer
@@ -72,7 +72,7 @@
             btn_EndCall.BackgroundImageLayout = ImageLayout.Zoom;
             btn_EndCall.FlatAppearance.BorderSize = 0;
             btn_EndCall.FlatStyle = FlatStyle.Flat;
-            btn_EndCall.Location = new Point(108, 308);
+            btn_EndCall.Location = new Point(114, 308);
             btn_EndCall.Name = "btn_EndCall";
             btn_EndCall.Padding = new Padding(0, 10, 0, 0);
             btn_EndCall.Size = new Size(80, 80);
@@ -87,7 +87,7 @@
             btn_MuteMic.BackgroundImage = Properties.Resources.microphone_105;
             btn_MuteMic.BackgroundImageLayout = ImageLayout.Stretch;
             btn_MuteMic.FlatStyle = FlatStyle.Flat;
-            btn_MuteMic.Location = new Point(194, 308);
+            btn_MuteMic.Location = new Point(200, 308);
             btn_MuteMic.Name = "btn_MuteMic";
             btn_MuteMic.Size = new Size(80, 80);
             btn_MuteMic.TabIndex = 3;
@@ -101,7 +101,7 @@
             btn_DTMF.BackgroundImageLayout = ImageLayout.Stretch;
             btn_DTMF.FlatAppearance.BorderSize = 0;
             btn_DTMF.FlatStyle = FlatStyle.Flat;
-            btn_DTMF.Location = new Point(22, 308);
+            btn_DTMF.Location = new Point(28, 308);
             btn_DTMF.Name = "btn_DTMF";
             btn_DTMF.Size = new Size(80, 80);
             btn_DTMF.TabIndex = 4;
@@ -115,7 +115,7 @@
             btn_Hold.BackgroundImageLayout = ImageLayout.Stretch;
             btn_Hold.FlatAppearance.BorderSize = 0;
             btn_Hold.FlatStyle = FlatStyle.Flat;
-            btn_Hold.Location = new Point(108, 222);
+            btn_Hold.Location = new Point(114, 222);
             btn_Hold.Name = "btn_Hold";
             btn_Hold.Size = new Size(80, 80);
             btn_Hold.TabIndex = 5;
@@ -126,7 +126,7 @@
             // 
             btn_CardVerify.BackgroundImage = (Image)resources.GetObject("btn_CardVerify.BackgroundImage");
             btn_CardVerify.BackgroundImageLayout = ImageLayout.Stretch;
-            btn_CardVerify.Location = new Point(194, 222);
+            btn_CardVerify.Location = new Point(200, 222);
             btn_CardVerify.Name = "btn_CardVerify";
             btn_CardVerify.Size = new Size(80, 80);
             btn_CardVerify.TabIndex = 6;
@@ -143,10 +143,22 @@
             lb_VerifyResult.TabIndex = 7;
             lb_VerifyResult.TextAlign = ContentAlignment.MiddleCenter;
             // 
+            // btn_AddContact
+            // 
+            btn_AddContact.BackgroundImage = Properties.Resources.addcontact1;
+            btn_AddContact.BackgroundImageLayout = ImageLayout.Stretch;
+            btn_AddContact.Location = new Point(28, 222);
+            btn_AddContact.Name = "btn_AddContact";
+            btn_AddContact.Size = new Size(80, 80);
+            btn_AddContact.TabIndex = 8;
+            btn_AddContact.UseVisualStyleBackColor = true;
+            btn_AddContact.Click += btn_AddContact_Click;
+            // 
             // OnCallControl
             // 
             AutoScaleDimensions = new SizeF(7F, 15F);
             AutoScaleMode = AutoScaleMode.Font;
+            Controls.Add(btn_AddContact);
             Controls.Add(lb_VerifyResult);
             Controls.Add(btn_CardVerify);
             Controls.Add(btn_Hold);
@@ -172,5 +184,6 @@
         private CircleButton btn_Hold;
         private CircleButton btn_CardVerify;
         private Label lb_VerifyResult;
+        private CircleButton btn_AddContact;
     }
 }

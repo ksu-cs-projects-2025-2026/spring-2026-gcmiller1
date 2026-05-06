@@ -24,6 +24,7 @@ namespace AgentView
         private bool IsOnHold;
         private bool IsVerifyingCard;
         public event EventHandler VerifyCardRequested;
+        private ContactService contactService = new ContactService();
         public OnCallControl(string callSid, string from)
         {
             CallSid = callSid;
@@ -134,6 +135,18 @@ namespace AgentView
         private void OnCallControl_Load(object sender, EventArgs e)
         {
 
+        }
+
+        private void btn_AddContact_Click(object sender, EventArgs e)
+        {
+            var contact = contactService.GetCreateContactByPhone(FromNumber);
+
+            using var form = new ContactForm(contact);
+
+            if (form.ShowDialog() == DialogResult.OK)
+            {
+                contactService.UpdateContact(form.Contact);
+            }
         }
     }
 }
