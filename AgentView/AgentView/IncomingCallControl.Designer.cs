@@ -30,17 +30,16 @@
         {
             label1 = new Label();
             button1 = new Button();
-            this.AutoScaleMode = AutoScaleMode.Dpi;
             SuspendLayout();
             // 
             // label1
             // 
             label1.Anchor = AnchorStyles.Left;
             label1.AutoSize = true;
-            label1.Font = new Font("Segoe UI", 12F);
+            label1.Font = new Font("Figtree", 11.9999981F, FontStyle.Regular, GraphicsUnit.Point, 0);
             label1.Location = new Point(12, 9);
             label1.Name = "label1";
-            label1.Size = new Size(52, 21);
+            label1.Size = new Size(50, 20);
             label1.TabIndex = 0;
             label1.Text = "label1";
             // 

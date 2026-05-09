@@ -8,6 +8,8 @@ namespace AgentView
 {
     public class CallSummary
     {
+        public bool Answered { get; set; }
+
         public Contact Contact { get; set; }
 
         public string FromNumber { get; set; }

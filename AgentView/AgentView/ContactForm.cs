@@ -13,6 +13,7 @@ namespace AgentView
     public partial class ContactForm : Form
     {
         public Contact Contact { get; private set; }
+
         public ContactForm(Contact contact)
         {
             InitializeComponent();

@@ -34,6 +34,7 @@
             btn_Home = new Button();
             btn_History = new Button();
             panel_Menu = new Panel();
+            btn_Contacts = new Button();
             PanelActiveCall = new Panel();
             panel_Top = new Panel();
             panel_Logo = new Panel();
@@ -121,6 +122,7 @@
             // panel_Menu
             // 
             panel_Menu.BackColor = SystemColors.ControlLightLight;
+            panel_Menu.Controls.Add(btn_Contacts);
             panel_Menu.Controls.Add(btn_History);
             panel_Menu.Controls.Add(btn_Home);
             panel_Menu.Dock = DockStyle.Left;
@@ -128,6 +130,25 @@
             panel_Menu.Name = "panel_Menu";
             panel_Menu.Size = new Size(155, 478);
             panel_Menu.TabIndex = 6;
+            // 
+            // btn_Contacts
+            // 
+            btn_Contacts.BackgroundImageLayout = ImageLayout.Zoom;
+            btn_Contacts.Dock = DockStyle.Top;
+            btn_Contacts.FlatAppearance.BorderSize = 0;
+            btn_Contacts.FlatStyle = FlatStyle.Flat;
+            btn_Contacts.Font = new Font("Figtree Medium", 10F, FontStyle.Bold);
+            btn_Contacts.ForeColor = Color.FromArgb(0, 125, 217);
+            btn_Contacts.Image = Properties.Resources.profilesmall;
+            btn_Contacts.ImageAlign = ContentAlignment.MiddleLeft;
+            btn_Contacts.Location = new Point(0, 80);
+            btn_Contacts.Name = "btn_Contacts";
+            btn_Contacts.Size = new Size(155, 40);
+            btn_Contacts.TabIndex = 5;
+            btn_Contacts.Text = "  Contacts";
+            btn_Contacts.TextImageRelation = TextImageRelation.ImageBeforeText;
+            btn_Contacts.UseVisualStyleBackColor = true;
+            btn_Contacts.Click += btn_Contacts_Click;
             // 
             // PanelActiveCall
             // 
@@ -214,5 +235,6 @@
         private PictureBox pictureBox1;
         private System.Windows.Forms.Panel panel1;
         private System.Windows.Forms.Panel PanelActiveCall;
+        private Button btn_Contacts;
     }
 }

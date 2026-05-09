@@ -22,10 +22,10 @@ namespace AgentView
         private double latestCallSentiment;
         private string activeFromNumber;
         private bool cardVerified;
-
+        private readonly Dictionary<string, string> incomingCallNumbers = new();
         private string currentCallSid;
         private bool hold;
-
+        List<CallSummary> summaries = new List<CallSummary>();
         private const string AgentWsUrl = "wss://uncoquettishly-bilgiest-bronson.ngrok-free.dev/agent";
 
         public AgentController(MainView view)
@@ -143,6 +143,8 @@ namespace AgentView
                         string callSid = doc.RootElement.GetProperty("CallSid").GetString();
                         string from = doc.RootElement.GetProperty("From").GetString();
 
+                        incomingCallNumbers[callSid] = from;
+
                         var call = new Call
                         {
                             CallSid = callSid,
@@ -166,8 +168,15 @@ namespace AgentView
                     if (evt == "endCall")
                     {
                         var callSid = doc.RootElement.GetProperty("CallSid").GetString();
-                        Console.WriteLine($"Call ended: {callSid}");
-                        SaveCallSummary();
+                        if (callSid == currentCallSid)
+                        {
+                            SaveCallSummary();
+                        }
+                        else if (incomingCallNumbers.TryGetValue(callSid, out var missedFromNumber))
+                        {
+                            SaveMissedCallSummary(missedFromNumber);
+                            incomingCallNumbers.Remove(callSid);
+                        }
                         view.Invoke(() =>
                         {
                             if (view.HasActiveCallControl(callSid) && hold == false)
@@ -261,11 +270,60 @@ namespace AgentView
                 });
         }
 
+        private void SaveMissedCallSummary(string fromNumber)
+        {
+            var missedTime = DateTime.Now;
+
+            var summary = new CallSummary
+            {
+                Answered = false,
+                FromNumber = fromNumber,
+                CallEndTime = missedTime.ToString("yyyy-MM-dd HH:mm:ss")
+            };
+
+            var filePath = Path.Combine(
+                Directory.GetParent(AppDomain.CurrentDomain.BaseDirectory).Parent.Parent.Parent.FullName,
+                "CallSummary.json"
+            );
+
+            if (File.Exists(filePath))
+            {
+                var existingJson = File.ReadAllText(filePath);
+
+                if (!string.IsNullOrWhiteSpace(existingJson))
+                {
+                    if (existingJson.TrimStart().StartsWith("["))
+                    {
+                        summaries = JsonSerializer.Deserialize<List<CallSummary>>(existingJson) ?? new List<CallSummary>();
+                    }
+                    else
+                    {
+                        var existingSummary = JsonSerializer.Deserialize<CallSummary>(existingJson);
+
+                        if (existingSummary != null)
+                        {
+                            summaries.Add(existingSummary);
+                        }
+                    }
+                }
+            }
+
+            summaries.Add(summary);
+
+            var options = new JsonSerializerOptions
+            {
+                WriteIndented = true
+            };
+
+            File.WriteAllText(filePath, JsonSerializer.Serialize(summaries, options));
+        }
+
         private void SaveCallSummary()
         {
             callEndTime = DateTime.Now;
             var summary = new CallSummary
             {
+                Answered = true,
                 FromNumber = activeFromNumber,
                 CallStartTime = callStartTime.ToString("yyyy-MM-dd HH:mm:ss"),
                 CallEndTime = callEndTime.ToString("yyyy-MM-dd HH:mm:ss"),
@@ -279,7 +337,6 @@ namespace AgentView
                 "CallSummary.json"
             );
 
-            List<CallSummary> summaries = new List<CallSummary>();
 
             if (File.Exists(filePath))
             {
@@ -327,6 +384,7 @@ namespace AgentView
             latestCallSentiment = 0.0;
             cardVerified = false;
 
+            incomingCallNumbers.Remove(callSid);
             await commService.SendJsonAsync(new
             {
                 Action = "acceptCall",
@@ -409,7 +467,10 @@ namespace AgentView
         /// <returns></returns>
         private async Task EndCall(string callSid)
         {
-            currentCallSid = callSid;
+            if (callSid == currentCallSid)
+            {
+                SaveCallSummary();
+            }
             view.SetAgentOffCall();
             agent.SetStatus(AgentStatus.Available);
 

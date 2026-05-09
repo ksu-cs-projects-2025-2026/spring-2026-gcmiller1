@@ -16,7 +16,8 @@ namespace AgentView
         private enum MainContentView
         {
             Home,
-            History
+            History,
+            Contacts
         }
 
         private MainContentView currentView = MainContentView.Home;
@@ -29,6 +30,7 @@ namespace AgentView
         public event Func<string, Task> CardVerificationRequested;
         public event Action<AgentStatus> StatusChanged;
 
+        private List<Contact> loadedContacts = new();
         private readonly Dictionary<string, IncomingCallControl> incomingCallRows = new();
         private readonly List<(string CallSid, string From)> pendingCalls = new();
         private OnCallForm activeCallForm;
@@ -380,20 +382,23 @@ namespace AgentView
 
             if (status == AgentStatus.Available)
             {
-                PanelIncomingCalls.Visible = true;
-                PanelActiveCall.Visible = false;
-
-                foreach (var kvp in incomingCallRows)
+                if (currentView == MainContentView.Home)
                 {
-                    var ctrl = kvp.Value;
-                    if (!PanelIncomingCalls.Controls.Contains(ctrl))
-                    {
-                        PanelIncomingCalls.Controls.Add(ctrl);
-                        PanelIncomingCalls.Controls.SetChildIndex(ctrl, 0);
-                    }
-                }
+                    PanelIncomingCalls.Visible = true;
+                    PanelActiveCall.Visible = false;
 
-                FlushPendingCalls();
+                    foreach (var kvp in incomingCallRows)
+                    {
+                        var ctrl = kvp.Value;
+                        if (!PanelIncomingCalls.Controls.Contains(ctrl))
+                        {
+                            PanelIncomingCalls.Controls.Add(ctrl);
+                            PanelIncomingCalls.Controls.SetChildIndex(ctrl, 0);
+                        }
+                    }
+
+                    FlushPendingCalls();
+                }
             }
             else
             {
@@ -478,27 +483,153 @@ namespace AgentView
                 var singleSummary = JsonSerializer.Deserialize<CallSummary>(json);
                 summaries = singleSummary != null ? new List<CallSummary> { singleSummary } : new List<CallSummary>();
             }
-
+            var label = new Label();
             foreach (var summary in summaries.AsEnumerable().Reverse())
             {
-                var label = new Label
+                if (summary.Answered == true)
                 {
-                    AutoSize = false,
-                    Height = 110,
-                    Dock = DockStyle.Top,
-                    Padding = new Padding(10),
-                    BorderStyle = BorderStyle.FixedSingle,
-                    Text =
-                        $"From: {summary.FromNumber}{Environment.NewLine}" +
-                        $"Start: {summary.CallStartTime}{Environment.NewLine}" +
-                        $"Length: {summary.CallLength}{Environment.NewLine}" +
-                        $"Sentiment: {summary.CallSentiment:F2}{Environment.NewLine}" +
-                        $"Card Verified: {(summary.CardVerified ? "Yes" : "No")}"
-                };
+                    label = new Label
+                    {
+                        AutoSize = false,
+                        Height = 110,
+                        Dock = DockStyle.Top,
+                        Padding = new Padding(10),
+                        BorderStyle = BorderStyle.FixedSingle,
+                        Text =
+                            $"From: {summary.FromNumber}{Environment.NewLine}" +
+                            $"Start: {summary.CallStartTime}{Environment.NewLine}" +
+                            $"Length: {summary.CallLength}{Environment.NewLine}" +
+                            $"Sentiment: {summary.CallSentiment:F2}{Environment.NewLine}" +
+                            $"Card Verified: {(summary.CardVerified ? "Yes" : "No")}"
+                    };
+
+                }
+
+                else
+                {
+                    label = new Label
+                    {
+                        AutoSize = false,
+                        Height = 110,
+                        Dock = DockStyle.Top,
+                        Padding = new Padding(10),
+                        BorderStyle = BorderStyle.FixedSingle,
+                        Text =
+                            $"Call Missed{Environment.NewLine}" +
+                            $"From: {summary.FromNumber}{Environment.NewLine}" +
+                            $"Start: {summary.CallEndTime}{Environment.NewLine}"
+                    };
+                }
+
 
                 PanelIncomingCalls.Controls.Add(label);
                 PanelIncomingCalls.Controls.SetChildIndex(label, 0);
             }
+        }
+
+        private void ShowContactsView()
+        {
+            currentView = MainContentView.Contacts;
+
+            PanelIncomingCalls.Controls.Clear();
+            PanelIncomingCalls.Visible = true;
+            PanelActiveCall.Visible = false;
+
+            var filePath = Path.Combine(
+                Directory.GetParent(AppDomain.CurrentDomain.BaseDirectory).Parent.Parent.Parent.FullName,
+                "Contacts.json"
+            );
+
+            if (!File.Exists(filePath))
+            {
+                PanelIncomingCalls.Controls.Add(new Label
+                {
+                    Text = "No contacts found.",
+                    Dock = DockStyle.Top,
+                    Height = 40,
+                    Padding = new Padding(10)
+                });
+
+                return;
+            }
+
+            var json = File.ReadAllText(filePath);
+
+            if (string.IsNullOrWhiteSpace(json))
+            {
+                PanelIncomingCalls.Controls.Add(new Label
+                {
+                    Text = "No contacts found.",
+                    Dock = DockStyle.Top,
+                    Height = 40,
+                    Padding = new Padding(10)
+                });
+
+                return;
+            }
+
+            List<Contact> contacts;
+
+            if (json.TrimStart().StartsWith("["))
+            {
+                contacts = JsonSerializer.Deserialize<List<Contact>>(json) ?? new List<Contact>();
+            }
+            else
+            {
+                var singleContact = JsonSerializer.Deserialize<Contact>(json);
+                contacts = singleContact != null
+                    ? new List<Contact> { singleContact }
+                    : new List<Contact>();
+            }
+
+            foreach (var contact in contacts
+                .OrderBy(c => c.LastName)
+                .ThenBy(c => c.FirstName)
+                .Reverse())
+            {
+                var ctrl = new ContactControl(contact)
+                {
+                    Width = PanelIncomingCalls.ClientSize.Width - 20,
+                    Dock = DockStyle.Top
+                };
+
+                ctrl.ContactUpdated += (_, __) =>
+                {
+                    SaveContactsToJson();
+                };
+
+                ctrl.ContactDeleted += (_, __) =>
+                {
+                    DeleteContact(ctrl);
+                };
+
+                PanelIncomingCalls.Controls.Add(ctrl);
+                PanelIncomingCalls.Controls.SetChildIndex(ctrl, 0);
+            }
+            loadedContacts = contacts;
+        }
+
+        private void DeleteContact(ContactControl ctrl)
+        {
+            loadedContacts.Remove(ctrl.Contact);
+            PanelIncomingCalls.Controls.Remove(ctrl);
+            ctrl.Dispose();
+            SaveContactsToJson();
+        }
+
+        private void SaveContactsToJson()
+        {
+            var filePath = Path.Combine(
+                Directory.GetParent(AppDomain.CurrentDomain.BaseDirectory).Parent.Parent.Parent.FullName,
+                "Contacts.json"
+            );
+
+            var options = new JsonSerializerOptions
+            {
+                WriteIndented = true
+            };
+
+            File.WriteAllText(filePath, JsonSerializer.Serialize(loadedContacts, options));
         }
 
         private void btn_History_Click(object sender, EventArgs e)
@@ -509,6 +640,11 @@ namespace AgentView
         private void btn_Home_Click(object sender, EventArgs e)
         {
             ShowHomeView();
+        }
+
+        private void btn_Contacts_Click(object sender, EventArgs e)
+        {
+            ShowContactsView();
         }
     }
 }
