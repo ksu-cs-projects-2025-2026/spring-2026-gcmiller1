@@ -25,7 +25,8 @@ namespace AgentView
         private readonly Dictionary<string, string> incomingCallNumbers = new();
         private string currentCallSid;
         private bool hold;
-        List<CallSummary> summaries = new List<CallSummary>();
+        private bool activeCallConnected;
+        private bool activeCallInbound;
         private const string AgentWsUrl = "wss://uncoquettishly-bilgiest-bronson.ngrok-free.dev/agent";
 
         public AgentController(MainView view)
@@ -92,11 +93,32 @@ namespace AgentView
             view.MuteToggled += ToggleMicMute;
             view.DtmfRequested += SendToDTMF;
             view.CardVerificationRequested += StartCardVerification;
+            view.ContactCallRequested += StartOutboundCall;
 
             view.StatusChanged += status =>
             {
                 agent.SetStatus(status);
             };
+        }
+
+        /// <summary>
+        /// Tells the commservice to notify the server that they are attempting to make an outbound call
+        /// </summary>
+        /// <param name="contact"></param>
+        /// <returns></returns>
+        private async Task StartOutboundCall(Contact contact)
+        {
+            if (string.IsNullOrWhiteSpace(contact.PhoneNumber))
+            {
+                return;
+            }
+
+            await commService.SendJsonAsync(new
+            {
+                Action = "startOutboundCall",
+                To = contact.PhoneNumber,
+                DisplayName = $"{contact.FirstName} {contact.LastName}".Trim()
+            });
         }
 
         /// <summary>
@@ -174,7 +196,7 @@ namespace AgentView
                         }
                         else if (incomingCallNumbers.TryGetValue(callSid, out var missedFromNumber))
                         {
-                            SaveMissedCallSummary(missedFromNumber);
+                            SaveMissedInboundCallSummary(missedFromNumber);
                             incomingCallNumbers.Remove(callSid);
                         }
                         view.Invoke(() =>
@@ -261,6 +283,43 @@ namespace AgentView
                         });
                     }
 
+                    if (evt == "outboundCallStarted")
+                    {
+                        var callSid = doc.RootElement.GetProperty("CallSid").GetString();
+                        var to = doc.RootElement.GetProperty("To").GetString();
+
+                        currentCallSid = callSid;
+                        activeFromNumber = to;
+                        latestCallSentiment = 0.0;
+                        cardVerified = false;
+                        activeCallConnected = false;
+                        activeCallInbound = false;
+
+                        agent.SetStatus(AgentStatus.OnCall);
+
+                        view.Invoke(() =>
+                        {
+                            view.SetAgentOnCall();
+                            view.ShowOutboundCalling(callSid, to);
+                        });
+                    }
+
+                    if (evt == "outboundCallAnswered")
+                    {
+                        var callSid = doc.RootElement.GetProperty("CallSid").GetString();
+
+                        if (callSid == currentCallSid)
+                        {
+                            activeCallConnected = true;
+                            callStartTime = DateTime.Now;
+                        }
+
+                        view.Invoke(() =>
+                        {
+                            view.MarkOutboundCallAnswered(callSid);
+                        });
+                    }
+
                     await Task.CompletedTask;
                 },
                 async binary =>
@@ -270,54 +329,28 @@ namespace AgentView
                 });
         }
 
-        private void SaveMissedCallSummary(string fromNumber)
+        /// <summary>
+        /// Saves a summary of a call that was missed into the Call History log
+        /// </summary>
+        /// <param name="fromNumber"></param>
+        private void SaveMissedInboundCallSummary(string fromNumber)
         {
             var missedTime = DateTime.Now;
 
             var summary = new CallSummary
             {
                 Answered = false,
+                Inbound = true,
                 FromNumber = fromNumber,
                 CallEndTime = missedTime.ToString("yyyy-MM-dd HH:mm:ss")
             };
 
-            var filePath = Path.Combine(
-                Directory.GetParent(AppDomain.CurrentDomain.BaseDirectory).Parent.Parent.Parent.FullName,
-                "CallSummary.json"
-            );
-
-            if (File.Exists(filePath))
-            {
-                var existingJson = File.ReadAllText(filePath);
-
-                if (!string.IsNullOrWhiteSpace(existingJson))
-                {
-                    if (existingJson.TrimStart().StartsWith("["))
-                    {
-                        summaries = JsonSerializer.Deserialize<List<CallSummary>>(existingJson) ?? new List<CallSummary>();
-                    }
-                    else
-                    {
-                        var existingSummary = JsonSerializer.Deserialize<CallSummary>(existingJson);
-
-                        if (existingSummary != null)
-                        {
-                            summaries.Add(existingSummary);
-                        }
-                    }
-                }
-            }
-
-            summaries.Add(summary);
-
-            var options = new JsonSerializerOptions
-            {
-                WriteIndented = true
-            };
-
-            File.WriteAllText(filePath, JsonSerializer.Serialize(summaries, options));
+            SaveSummaryToJson(summary);
         }
 
+        /// <summary>
+        /// Saves a summary of a call that was successful
+        /// </summary>
         private void SaveCallSummary()
         {
             callEndTime = DateTime.Now;
@@ -329,14 +362,39 @@ namespace AgentView
                 CallEndTime = callEndTime.ToString("yyyy-MM-dd HH:mm:ss"),
                 CallLength = (callEndTime - callStartTime).ToString(@"hh\:mm\:ss"),
                 CallSentiment = latestCallSentiment,
-                CardVerified = cardVerified
+                CardVerified = cardVerified,
+                Inbound = activeCallInbound
             };
 
+            SaveSummaryToJson(summary);
+        }
+
+        /// <summary>
+        /// Saves the summary of a missed outbound call in the correct format
+        /// </summary>
+        private void SaveMissedOutboundCallSummary()
+        {
+            var missedTime = DateTime.Now;
+
+            var summary = new CallSummary
+            {
+                Answered = false,
+                Inbound = false,
+                FromNumber = activeFromNumber,
+                CallEndTime = missedTime.ToString("yyyy-MM-dd HH:mm:ss")
+            };
+
+            SaveSummaryToJson(summary);
+        }
+
+        private void SaveSummaryToJson(CallSummary summary)
+        {
             var filePath = Path.Combine(
                 Directory.GetParent(AppDomain.CurrentDomain.BaseDirectory).Parent.Parent.Parent.FullName,
                 "CallSummary.json"
             );
 
+            var summaries = new List<CallSummary>();
 
             if (File.Exists(filePath))
             {
@@ -344,18 +402,29 @@ namespace AgentView
 
                 if (!string.IsNullOrWhiteSpace(existingJson))
                 {
-                    if (existingJson.TrimStart().StartsWith("["))
+                    try
                     {
-                        summaries = JsonSerializer.Deserialize<List<CallSummary>>(existingJson) ?? new List<CallSummary>();
-                    }
-                    else
-                    {
-                        var existingSummary = JsonSerializer.Deserialize<CallSummary>(existingJson);
-
-                        if (existingSummary != null)
+                        if (existingJson.TrimStart().StartsWith("["))
                         {
-                            summaries.Add(existingSummary);
+                            summaries = JsonSerializer.Deserialize<List<CallSummary>>(existingJson)
+                                        ?? new List<CallSummary>();
                         }
+                        else
+                        {
+                            var existingSummary = JsonSerializer.Deserialize<CallSummary>(existingJson);
+
+                            if (existingSummary != null)
+                            {
+                                summaries.Add(existingSummary);
+                            }
+                        }
+                    }
+                    catch (JsonException ex)
+                    {
+                        Console.WriteLine("Error: Could not read CallSummary.json:");
+                        Console.WriteLine(ex.Message);
+
+                        summaries = new List<CallSummary>();
                     }
                 }
             }
@@ -383,6 +452,8 @@ namespace AgentView
             callStartTime = DateTime.Now;
             latestCallSentiment = 0.0;
             cardVerified = false;
+            activeCallConnected = true;
+            activeCallInbound = true;
 
             incomingCallNumbers.Remove(callSid);
             await commService.SendJsonAsync(new
@@ -467,9 +538,13 @@ namespace AgentView
         /// <returns></returns>
         private async Task EndCall(string callSid)
         {
-            if (callSid == currentCallSid)
+            if (callSid == currentCallSid && activeCallConnected)
             {
                 SaveCallSummary();
+            }
+            else if (!activeCallInbound)
+            {
+                SaveMissedOutboundCallSummary();
             }
             view.SetAgentOffCall();
             agent.SetStatus(AgentStatus.Available);
@@ -480,11 +555,11 @@ namespace AgentView
                 CallSid = callSid
             });
 
-            Console.WriteLine($"Ended call {callSid}");
             callManager.EndCall(callSid);
 
             view.ClearActiveCall();
             currentCallSid = "";
+            activeCallConnected = false;
         }
 
         /// <summary>

@@ -32,6 +32,7 @@
             btn_Edit = new Button();
             lb_ContactName = new Label();
             btn_Info = new Button();
+            btn_Call = new Button();
             SuspendLayout();
             // 
             // btn_Delete
@@ -82,18 +83,34 @@
             btn_Info.Dock = DockStyle.Right;
             btn_Info.FlatAppearance.BorderSize = 0;
             btn_Info.FlatStyle = FlatStyle.Flat;
-            btn_Info.Location = new Point(480, 0);
+            btn_Info.Location = new Point(425, 0);
             btn_Info.Name = "btn_Info";
             btn_Info.Size = new Size(55, 62);
             btn_Info.TabIndex = 3;
             btn_Info.UseVisualStyleBackColor = true;
             btn_Info.Click += btn_Info_Click;
             // 
+            // btn_Call
+            // 
+            btn_Call.BackColor = Color.SpringGreen;
+            btn_Call.BackgroundImage = Properties.Resources.telephone_174;
+            btn_Call.BackgroundImageLayout = ImageLayout.Zoom;
+            btn_Call.Dock = DockStyle.Right;
+            btn_Call.FlatAppearance.BorderSize = 0;
+            btn_Call.FlatStyle = FlatStyle.Flat;
+            btn_Call.Location = new Point(480, 0);
+            btn_Call.Name = "btn_Call";
+            btn_Call.Size = new Size(55, 62);
+            btn_Call.TabIndex = 4;
+            btn_Call.UseVisualStyleBackColor = false;
+            btn_Call.Click += btn_Call_Click;
+            // 
             // ContactControl
             // 
             AutoScaleDimensions = new SizeF(7F, 15F);
             AutoScaleMode = AutoScaleMode.Font;
             Controls.Add(btn_Info);
+            Controls.Add(btn_Call);
             Controls.Add(lb_ContactName);
             Controls.Add(btn_Edit);
             Controls.Add(btn_Delete);
@@ -109,5 +126,6 @@
         private Button btn_Edit;
         private Label lb_ContactName;
         private Button btn_Info;
+        private Button btn_Call;
     }
 }

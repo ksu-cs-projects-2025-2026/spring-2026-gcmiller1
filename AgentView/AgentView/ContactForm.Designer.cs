@@ -35,6 +35,13 @@
             lb_FirstName = new Label();
             lb_LastName = new Label();
             lb_Email = new Label();
+            lb_PhoneNumber = new Label();
+            tb_PhoneAreaCode = new TextBox();
+            lb_plus1 = new Label();
+            lb_AreaCodeClose = new Label();
+            tb_ThreeDigits = new TextBox();
+            lb_DigitDash = new Label();
+            tb_FourDigits = new TextBox();
             SuspendLayout();
             // 
             // btn_SaveContact
@@ -102,12 +109,80 @@
             lb_Email.TabIndex = 6;
             lb_Email.Text = "Email:";
             // 
+            // lb_PhoneNumber
+            // 
+            lb_PhoneNumber.AutoSize = true;
+            lb_PhoneNumber.Font = new Font("Figtree", 9.749999F, FontStyle.Regular, GraphicsUnit.Point, 0);
+            lb_PhoneNumber.Location = new Point(20, 125);
+            lb_PhoneNumber.Name = "lb_PhoneNumber";
+            lb_PhoneNumber.Size = new Size(58, 16);
+            lb_PhoneNumber.TabIndex = 7;
+            lb_PhoneNumber.Text = "Phone #:";
+            // 
+            // tb_PhoneAreaCode
+            // 
+            tb_PhoneAreaCode.Location = new Point(108, 122);
+            tb_PhoneAreaCode.Name = "tb_PhoneAreaCode";
+            tb_PhoneAreaCode.Size = new Size(40, 23);
+            tb_PhoneAreaCode.TabIndex = 8;
+            // 
+            // lb_plus1
+            // 
+            lb_plus1.AutoSize = true;
+            lb_plus1.Font = new Font("Figtree", 9.749999F, FontStyle.Regular, GraphicsUnit.Point, 0);
+            lb_plus1.Location = new Point(80, 125);
+            lb_plus1.Name = "lb_plus1";
+            lb_plus1.Size = new Size(28, 16);
+            lb_plus1.TabIndex = 9;
+            lb_plus1.Text = "+1 (";
+            // 
+            // lb_AreaCodeClose
+            // 
+            lb_AreaCodeClose.AutoSize = true;
+            lb_AreaCodeClose.Font = new Font("Figtree", 9.749999F, FontStyle.Regular, GraphicsUnit.Point, 0);
+            lb_AreaCodeClose.Location = new Point(150, 125);
+            lb_AreaCodeClose.Name = "lb_AreaCodeClose";
+            lb_AreaCodeClose.Size = new Size(12, 16);
+            lb_AreaCodeClose.TabIndex = 10;
+            lb_AreaCodeClose.Text = ")";
+            // 
+            // tb_ThreeDigits
+            // 
+            tb_ThreeDigits.Location = new Point(164, 122);
+            tb_ThreeDigits.Name = "tb_ThreeDigits";
+            tb_ThreeDigits.Size = new Size(40, 23);
+            tb_ThreeDigits.TabIndex = 11;
+            // 
+            // lb_DigitDash
+            // 
+            lb_DigitDash.AutoSize = true;
+            lb_DigitDash.Font = new Font("Figtree", 9.749999F, FontStyle.Regular, GraphicsUnit.Point, 0);
+            lb_DigitDash.Location = new Point(209, 125);
+            lb_DigitDash.Name = "lb_DigitDash";
+            lb_DigitDash.Size = new Size(12, 16);
+            lb_DigitDash.TabIndex = 12;
+            lb_DigitDash.Text = "-";
+            // 
+            // tb_FourDigits
+            // 
+            tb_FourDigits.Location = new Point(226, 122);
+            tb_FourDigits.Name = "tb_FourDigits";
+            tb_FourDigits.Size = new Size(54, 23);
+            tb_FourDigits.TabIndex = 13;
+            // 
             // ContactForm
             // 
             AutoScaleDimensions = new SizeF(7F, 15F);
             AutoScaleMode = AutoScaleMode.Font;
             BackColor = Color.FromArgb(242, 246, 248);
             ClientSize = new Size(334, 261);
+            Controls.Add(tb_FourDigits);
+            Controls.Add(lb_DigitDash);
+            Controls.Add(tb_ThreeDigits);
+            Controls.Add(lb_AreaCodeClose);
+            Controls.Add(lb_plus1);
+            Controls.Add(tb_PhoneAreaCode);
+            Controls.Add(lb_PhoneNumber);
             Controls.Add(lb_Email);
             Controls.Add(lb_LastName);
             Controls.Add(lb_FirstName);
@@ -130,5 +205,12 @@
         private Label lb_FirstName;
         private Label lb_LastName;
         private Label lb_Email;
+        private Label lb_PhoneNumber;
+        private TextBox tb_PhoneAreaCode;
+        private Label lb_plus1;
+        private Label lb_AreaCodeClose;
+        private TextBox tb_ThreeDigits;
+        private Label lb_DigitDash;
+        private TextBox tb_FourDigits;
     }
 }

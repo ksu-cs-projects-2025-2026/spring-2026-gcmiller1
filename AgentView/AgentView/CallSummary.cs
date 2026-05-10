@@ -10,6 +10,8 @@ namespace AgentView
     {
         public bool Answered { get; set; }
 
+        public bool Inbound { get; set; }
+
         public Contact Contact { get; set; }
 
         public string FromNumber { get; set; }

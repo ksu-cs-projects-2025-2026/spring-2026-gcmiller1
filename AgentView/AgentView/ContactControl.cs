@@ -16,6 +16,7 @@ namespace AgentView
 
         public event EventHandler ContactUpdated;
         public event EventHandler ContactDeleted;
+        public event EventHandler<Contact> CallRequested;
 
         public ContactControl(Contact contact)
         {
@@ -56,19 +57,47 @@ namespace AgentView
                 $"First Name: {Contact.FirstName}{Environment.NewLine}" +
                 $"Last Name: {Contact.LastName}{Environment.NewLine}" +
                 $"Phone Number: {Contact.PhoneNumber}{Environment.NewLine}" +
-                $"Email: {Contact.Email}";
+                $"Email: {Contact.Email}{Environment.NewLine}" +
+                $"Contact Created: {Contact.CreatedOn}";
 
             MessageBox.Show(
                 info,
                 $"{Contact.FirstName} {Contact.LastName}",
                 MessageBoxButtons.OK,
-                MessageBoxIcon.Information
+                MessageBoxIcon.None
             );
         }
 
         private void RefreshContactDisplay()
         {
             lb_ContactName.Text = $"{Contact.LastName}, {Contact.FirstName}";
+        }
+
+        private void btn_Call_Click(object sender, EventArgs e)
+        {
+            if (string.IsNullOrWhiteSpace(Contact.PhoneNumber))
+            {
+                MessageBox.Show(
+                    "This contact does not have a phone number.",
+                    "Cannot Call",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Warning
+                );
+
+                return;
+            }
+
+            var result = MessageBox.Show(
+                $"Call {Contact.FirstName} {Contact.LastName} at {Contact.PhoneNumber}?",
+                "Confirm Outbound Call",
+                MessageBoxButtons.YesNo,
+                MessageBoxIcon.Question
+            );
+
+            if (result == DialogResult.Yes)
+            {
+                CallRequested?.Invoke(this, Contact);
+            }
         }
     }
 }

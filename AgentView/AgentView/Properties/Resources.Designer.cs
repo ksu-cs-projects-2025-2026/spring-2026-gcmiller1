@@ -83,6 +83,26 @@ namespace AgentView.Properties {
         /// <summary>
         ///   Looks up a localized resource of type System.Drawing.Bitmap.
         /// </summary>
+        internal static System.Drawing.Bitmap addnewcontact {
+            get {
+                object obj = ResourceManager.GetObject("addnewcontact", resourceCulture);
+                return ((System.Drawing.Bitmap)(obj));
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized resource of type System.Drawing.Bitmap.
+        /// </summary>
+        internal static System.Drawing.Bitmap addnewcontactsmall {
+            get {
+                object obj = ResourceManager.GetObject("addnewcontactsmall", resourceCulture);
+                return ((System.Drawing.Bitmap)(obj));
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized resource of type System.Drawing.Bitmap.
+        /// </summary>
         internal static System.Drawing.Bitmap edit {
             get {
                 object obj = ResourceManager.GetObject("edit", resourceCulture);
@@ -216,6 +236,16 @@ namespace AgentView.Properties {
         internal static System.Drawing.Bitmap telephone_173 {
             get {
                 object obj = ResourceManager.GetObject("telephone-173", resourceCulture);
+                return ((System.Drawing.Bitmap)(obj));
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized resource of type System.Drawing.Bitmap.
+        /// </summary>
+        internal static System.Drawing.Bitmap telephone_174 {
+            get {
+                object obj = ResourceManager.GetObject("telephone-174", resourceCulture);
                 return ((System.Drawing.Bitmap)(obj));
             }
         }

@@ -16,7 +16,7 @@ namespace AgentView
 
         private TextBox txtTranscript;
         private Label lb_Sentiment;
-        public OnCallForm(string callSid, string fromNumber)
+        public OnCallForm(string callSid, string fromNumber, bool startConnected = true)
         {
             Text = $"Active Call - {fromNumber}";
             TopMost = true;
@@ -40,7 +40,7 @@ namespace AgentView
                 Font = new Font("Segoe UI", 10, FontStyle.Bold)
             };
 
-            CallControl = new OnCallControl(callSid, fromNumber)
+            CallControl = new OnCallControl(callSid, fromNumber, startConnected)
             {
                 Dock = DockStyle.Fill
             };

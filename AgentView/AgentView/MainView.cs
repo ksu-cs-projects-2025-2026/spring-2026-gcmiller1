@@ -28,6 +28,7 @@ namespace AgentView
         public event Func<bool, Task> MuteToggled;
         public event Func<Task> DtmfRequested;
         public event Func<string, Task> CardVerificationRequested;
+        public event Func<Contact, Task> ContactCallRequested;
         public event Action<AgentStatus> StatusChanged;
 
         private List<Contact> loadedContacts = new();
@@ -69,6 +70,8 @@ namespace AgentView
         private async void MainView_Load(object sender, EventArgs e)
         {
             comboBox1.SelectedItem = AgentStatus.Available;
+            SetSelectedMenuButton(MainContentView.Home);
+            btn_AddNewContact.Visible = false;
         }
 
         /// <summary>
@@ -316,6 +319,112 @@ namespace AgentView
             }
         }
 
+        /// <summary>
+        /// The functionality of the CallForm when an outbound call is being made
+        /// </summary>
+        /// <param name="callSid"></param>
+        /// <param name="phoneNumber"></param>
+        public void ShowOutboundCalling(string callSid, string phoneNumber)
+        {
+            PanelIncomingCalls.Visible = false;
+            PanelActiveCall.Visible = false;
+
+            if (activeCallForm != null && !activeCallForm.IsDisposed)
+            {
+                activeCallForm.Close();
+                activeCallForm.Dispose();
+                activeCallForm = null;
+                activeCallControl = null;
+            }
+
+            var callForm = new OnCallForm(callSid, phoneNumber, startConnected: false);
+
+            callForm.StartPosition = FormStartPosition.Manual;
+            callForm.Left = this.Right + 10;
+            callForm.Top = this.Top;
+
+            activeCallForm = callForm;
+            activeCallControl = callForm.CallControl;
+
+            activeCallControl.MuteUnmute += async mute =>
+            {
+                if (MuteToggled != null)
+                {
+                    await MuteToggled(mute);
+                }
+            };
+
+            activeCallControl.SendToDTMF += async (_, __) =>
+            {
+                if (DtmfRequested != null)
+                {
+                    await DtmfRequested();
+                }
+            };
+
+            activeCallControl.CallEnded += async (_, __) =>
+            {
+                if (EndCallRequested != null)
+                {
+                    await EndCallRequested(callSid);
+                }
+            };
+
+            activeCallControl.OnHold += async isOnHold =>
+            {
+                if (isOnHold)
+                {
+                    if (HoldRequested != null)
+                    {
+                        await HoldRequested(callSid);
+                    }
+                }
+                else
+                {
+                    if (ResumeRequested != null)
+                    {
+                        await ResumeRequested(callSid);
+                    }
+                }
+            };
+
+            activeCallControl.VerifyCardRequested += async (_, __) =>
+            {
+                if (CardVerificationRequested != null)
+                {
+                    await CardVerificationRequested(callSid);
+                }
+            };
+
+            callForm.FormClosed += (_, __) =>
+            {
+                activeCallControl = null;
+                activeCallForm = null;
+            };
+
+            callForm.Show(this);
+            callForm.BringToFront();
+            callForm.Activate();
+        }
+
+        /// <summary>
+        /// Lets the CallControl know that their outbound phone call has been answered
+        /// </summary>
+        /// <param name="callSid"></param>
+        public void MarkOutboundCallAnswered(string callSid)
+        {
+            if (activeCallControl != null && activeCallControl.CallSid == callSid)
+            {
+                activeCallControl.StartConnectedCall();
+            }
+        }
+
+        /// <summary>
+        /// Shows the transcript of the active call in the CallForm
+        /// </summary>
+        /// <param name="callSid"></param>
+        /// <param name="text"></param>
+        /// <param name="isFinal"></param>
         public void ShowTranscript(string callSid, string text, bool isFinal)
         {
             if (activeCallForm != null && activeCallForm.CallControl.CallSid == callSid)
@@ -324,6 +433,12 @@ namespace AgentView
             }
         }
 
+        /// <summary>
+        /// Shows the sentiment score of the active all in the CallForm
+        /// </summary>
+        /// <param name="callSid"></param>
+        /// <param name="score"></param>
+        /// <param name="label"></param>
         public void ShowSentiment(string callSid, double score, string label)
         {
             if (activeCallForm != null && activeCallForm.CallControl.CallSid == callSid)
@@ -411,10 +526,14 @@ namespace AgentView
             StatusChanged?.Invoke(status);
         }
 
+        /// <summary>
+        /// Populates the content panel with the Home page
+        /// </summary>
         private void ShowHomeView()
         {
             currentView = MainContentView.Home;
-
+            btn_AddNewContact.Visible = false;
+            SetSelectedMenuButton(MainContentView.Home);
             PanelIncomingCalls.Controls.Clear();
             PanelIncomingCalls.Visible = true;
             PanelActiveCall.Visible = false;
@@ -433,10 +552,14 @@ namespace AgentView
             FlushPendingCalls();
         }
 
+        /// <summary>
+        /// Populates the content panel with the History page
+        /// </summary>
         private void ShowHistoryView()
         {
             currentView = MainContentView.History;
-
+            btn_AddNewContact.Visible = false;
+            SetSelectedMenuButton(MainContentView.History);
             PanelIncomingCalls.Controls.Clear();
             PanelIncomingCalls.Visible = true;
             PanelActiveCall.Visible = false;
@@ -486,6 +609,8 @@ namespace AgentView
             var label = new Label();
             foreach (var summary in summaries.AsEnumerable().Reverse())
             {
+                var direction = summary.Inbound ? "Inbound" : "Outbound";
+                var numberLine = $"{summary.FromNumber} ({direction})"; // pretty sick
                 if (summary.Answered == true)
                 {
                     label = new Label
@@ -496,7 +621,7 @@ namespace AgentView
                         Padding = new Padding(10),
                         BorderStyle = BorderStyle.FixedSingle,
                         Text =
-                            $"From: {summary.FromNumber}{Environment.NewLine}" +
+                            $"From: {numberLine}{Environment.NewLine}" +
                             $"Start: {summary.CallStartTime}{Environment.NewLine}" +
                             $"Length: {summary.CallLength}{Environment.NewLine}" +
                             $"Sentiment: {summary.CallSentiment:F2}{Environment.NewLine}" +
@@ -516,8 +641,8 @@ namespace AgentView
                         BorderStyle = BorderStyle.FixedSingle,
                         Text =
                             $"Call Missed{Environment.NewLine}" +
-                            $"From: {summary.FromNumber}{Environment.NewLine}" +
-                            $"Start: {summary.CallEndTime}{Environment.NewLine}"
+                            $"{numberLine}{Environment.NewLine}" +
+                            $"Time: {summary.CallEndTime}{Environment.NewLine}"
                     };
                 }
 
@@ -527,10 +652,44 @@ namespace AgentView
             }
         }
 
+        private void AddContactControlToPanel(Contact contact)
+        {
+            var ctrl = new ContactControl(contact)
+            {
+                Width = PanelIncomingCalls.ClientSize.Width - 20,
+                Dock = DockStyle.Top
+            };
+
+            ctrl.ContactUpdated += (_, __) =>
+            {
+                SaveContactsToJson();
+            };
+
+            ctrl.ContactDeleted += (_, __) =>
+            {
+                DeleteContact(ctrl);
+            };
+
+            ctrl.CallRequested += async (_, contactToCall) =>
+            {
+                if (ContactCallRequested != null)
+                {
+                    await ContactCallRequested(contactToCall);
+                }
+            };
+
+            PanelIncomingCalls.Controls.Add(ctrl);
+            PanelIncomingCalls.Controls.SetChildIndex(ctrl, 0);
+        }
+
+        /// <summary>
+        /// Populates the content panel with the Contacts page
+        /// </summary>
         private void ShowContactsView()
         {
             currentView = MainContentView.Contacts;
-
+            btn_AddNewContact.Visible = true;
+            SetSelectedMenuButton(MainContentView.Contacts);
             PanelIncomingCalls.Controls.Clear();
             PanelIncomingCalls.Visible = true;
             PanelActiveCall.Visible = false;
@@ -587,24 +746,7 @@ namespace AgentView
                 .ThenBy(c => c.FirstName)
                 .Reverse())
             {
-                var ctrl = new ContactControl(contact)
-                {
-                    Width = PanelIncomingCalls.ClientSize.Width - 20,
-                    Dock = DockStyle.Top
-                };
-
-                ctrl.ContactUpdated += (_, __) =>
-                {
-                    SaveContactsToJson();
-                };
-
-                ctrl.ContactDeleted += (_, __) =>
-                {
-                    DeleteContact(ctrl);
-                };
-
-                PanelIncomingCalls.Controls.Add(ctrl);
-                PanelIncomingCalls.Controls.SetChildIndex(ctrl, 0);
+                AddContactControlToPanel(contact);
             }
             loadedContacts = contacts;
         }
@@ -645,6 +787,59 @@ namespace AgentView
         private void btn_Contacts_Click(object sender, EventArgs e)
         {
             ShowContactsView();
+        }
+
+        private void SetSelectedMenuButton(MainContentView selectedView)
+        {
+            btn_Home.BackColor = SystemColors.ControlLightLight;
+            btn_History.BackColor = SystemColors.ControlLightLight;
+            btn_Contacts.BackColor = SystemColors.ControlLightLight;
+
+            if (selectedView == MainContentView.Home)
+            {
+                btn_Home.BackColor = SystemColors.ControlLight;
+            }
+            else if (selectedView == MainContentView.History)
+            {
+                btn_History.BackColor = SystemColors.ControlLight;
+            }
+            else if (selectedView == MainContentView.Contacts)
+            {
+                btn_Contacts.BackColor = SystemColors.ControlLight;
+            }
+        }
+
+        private void btn_AddNewContact_Click(object sender, EventArgs e)
+        {
+            var contact = new Contact
+            {
+                FirstName = "",
+                LastName = "",
+                PhoneNumber = "",
+                Email = "",
+                CreatedOn = DateTime.Now.ToString("MM/dd/yyyy hh:mm tt")
+            };
+
+            using var form = new ContactForm(contact);
+
+            if (form.ShowDialog() == DialogResult.OK)
+            {
+                if (loadedContacts.Any(c => c.PhoneNumber == form.Contact.PhoneNumber))
+                {
+                    MessageBox.Show(
+                        "A contact with this phone number already exists.",
+                        "Duplicate Contact",
+                        MessageBoxButtons.OK,
+                        MessageBoxIcon.Warning
+                    );
+
+                    return;
+                }
+                loadedContacts.Add(form.Contact);
+                SaveContactsToJson();
+
+                AddContactControlToPanel(form.Contact);
+            }
         }
     }
 }

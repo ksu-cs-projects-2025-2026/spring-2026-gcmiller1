@@ -15,5 +15,7 @@ namespace AgentView
         public string PhoneNumber { get; set; }
 
         public string Email { get; set; }
+
+        public string CreatedOn { get; set; }
     }
 }

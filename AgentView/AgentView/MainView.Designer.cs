@@ -40,6 +40,7 @@
             panel_Logo = new Panel();
             pictureBox1 = new PictureBox();
             panel1 = new Panel();
+            btn_AddNewContact = new Button();
             panel_Menu.SuspendLayout();
             panel_Top.SuspendLayout();
             panel_Logo.SuspendLayout();
@@ -65,7 +66,7 @@
             comboBox1.Anchor = AnchorStyles.Right;
             comboBox1.DropDownStyle = ComboBoxStyle.DropDownList;
             comboBox1.FormattingEnabled = true;
-            comboBox1.Location = new Point(607, 6);
+            comboBox1.Location = new Point(607, 9);
             comboBox1.Name = "comboBox1";
             comboBox1.Size = new Size(121, 23);
             comboBox1.TabIndex = 1;
@@ -76,10 +77,10 @@
             PanelIncomingCalls.AutoScroll = true;
             PanelIncomingCalls.BackColor = Color.FromArgb(242, 246, 248);
             PanelIncomingCalls.Dock = DockStyle.Fill;
-            PanelIncomingCalls.Location = new Point(155, 66);
+            PanelIncomingCalls.Location = new Point(155, 72);
             PanelIncomingCalls.Name = "PanelIncomingCalls";
             PanelIncomingCalls.Padding = new Padding(10);
-            PanelIncomingCalls.Size = new Size(738, 444);
+            PanelIncomingCalls.Size = new Size(738, 438);
             PanelIncomingCalls.TabIndex = 2;
             PanelIncomingCalls.Paint += PanelIncomingCalls_Paint;
             // 
@@ -154,9 +155,9 @@
             // 
             PanelActiveCall.BackColor = Color.FromArgb(242, 246, 248);
             PanelActiveCall.Dock = DockStyle.Fill;
-            PanelActiveCall.Location = new Point(155, 66);
+            PanelActiveCall.Location = new Point(155, 72);
             PanelActiveCall.Name = "PanelActiveCall";
-            PanelActiveCall.Size = new Size(738, 444);
+            PanelActiveCall.Size = new Size(738, 438);
             PanelActiveCall.TabIndex = 9;
             PanelActiveCall.Visible = false;
             // 
@@ -192,13 +193,32 @@
             // panel1
             // 
             panel1.BackColor = Color.FromArgb(253, 254, 255);
+            panel1.Controls.Add(btn_AddNewContact);
             panel1.Controls.Add(comboBox1);
             panel1.Controls.Add(lb_Status);
             panel1.Dock = DockStyle.Top;
             panel1.Location = new Point(155, 32);
             panel1.Name = "panel1";
-            panel1.Size = new Size(738, 34);
+            panel1.Size = new Size(738, 40);
             panel1.TabIndex = 8;
+            // 
+            // btn_AddNewContact
+            // 
+            btn_AddNewContact.BackColor = Color.FromArgb(0, 125, 217);
+            btn_AddNewContact.Dock = DockStyle.Left;
+            btn_AddNewContact.FlatAppearance.BorderSize = 0;
+            btn_AddNewContact.FlatStyle = FlatStyle.Flat;
+            btn_AddNewContact.Font = new Font("Figtree", 9.749999F, FontStyle.Regular, GraphicsUnit.Point, 0);
+            btn_AddNewContact.ForeColor = Color.White;
+            btn_AddNewContact.Image = Properties.Resources.addnewcontactsmall;
+            btn_AddNewContact.ImageAlign = ContentAlignment.MiddleLeft;
+            btn_AddNewContact.Location = new Point(0, 0);
+            btn_AddNewContact.Name = "btn_AddNewContact";
+            btn_AddNewContact.Size = new Size(153, 40);
+            btn_AddNewContact.TabIndex = 2;
+            btn_AddNewContact.Text = "         Add New Contact";
+            btn_AddNewContact.UseVisualStyleBackColor = false;
+            btn_AddNewContact.Click += btn_AddNewContact_Click;
             // 
             // MainView
             // 
@@ -236,5 +256,6 @@
         private System.Windows.Forms.Panel panel1;
         private System.Windows.Forms.Panel PanelActiveCall;
         private Button btn_Contacts;
+        private Button btn_AddNewContact;
     }
 }

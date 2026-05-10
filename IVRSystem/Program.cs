@@ -18,6 +18,7 @@ using Task = System.Threading.Tasks.Task;
 #region
 string accountSid = Environment.GetEnvironmentVariable("TWILIO_ACCOUNT_SID");
 string authToken = Environment.GetEnvironmentVariable("TWILIO_AUTH_TOKEN");
+var twilioFromNumber = Environment.GetEnvironmentVariable("TWILIO_PHONE_NUMBER");
 TwilioClient.Init(accountSid, authToken);
 
 #endregion
@@ -240,6 +241,26 @@ app.MapGet("/stream", async (HttpContext context) =>
                     recognizers[callSid] = rec;
                     partialTranscriptCache[callSid] = "";
                     Console.WriteLine($"Twilio stream started for {callSid}");
+                    if (callState.TryGetValue(callSid, out var state) &&
+                        state == "outbound_dialing" &&
+                        callToAgent.TryGetValue(callSid, out var assignedAgentId) &&
+                        agentSockets.TryGetValue(assignedAgentId, out var assignedAgentWs) &&
+                        assignedAgentWs.State == WebSocketState.Open)
+                    {
+                        callState[callSid] = "connected";
+
+                        var answeredMsg = JsonSerializer.Serialize(new
+                        {
+                            @event = "outboundCallAnswered",
+                            CallSid = callSid
+                        });
+
+                        await assignedAgentWs.SendAsync(
+                            Encoding.UTF8.GetBytes(answeredMsg),
+                            WebSocketMessageType.Text,
+                            true,
+                            CancellationToken.None);
+                    }
                 }
                 if (evt == "media")
                 {
@@ -408,9 +429,10 @@ app.MapGet("/stream", async (HttpContext context) =>
             incomingData.Clear(); // successfully parsed JSON
 
         }
-        catch
+        catch (Exception ex)
         {
-            // JSON incomplete, wait for next WebSocket frame
+            Console.WriteLine("Agent socket error:");
+            Console.WriteLine(ex.ToString());
         }
     }
 });
@@ -484,6 +506,44 @@ app.MapGet("/agent", async (HttpContext context) =>
                     callState[callSid] = "redirecting";
                     Console.WriteLine($"Call {callSid} redirected to /dtmf");
                 }
+
+                if (action == "startOutboundCall")
+                {
+                    var toNumber = doc.RootElement.GetProperty("To").GetString();
+
+                    Console.WriteLine($"Agent {agentId} starting outbound call to {toNumber}");
+
+                    var call = CallResource.Create(
+                        to: new PhoneNumber(toNumber),
+                        from: new PhoneNumber(twilioFromNumber),
+                        url: new Uri($"https://{context.Request.Host}/outbound-connect"),
+                        method: Twilio.Http.HttpMethod.Post,
+                        statusCallback: new Uri($"https://{context.Request.Host}/status"),
+                        statusCallbackMethod: Twilio.Http.HttpMethod.Post
+                    );
+
+                    var callSid = call.Sid;
+
+                    activeCalls[callSid] = callSid;
+                    callState[callSid] = "outbound_dialing";
+                    callToAgent[callSid] = agentId;
+                    cardVerificationActive[callSid] = false;
+                    cardDigitBuffer[callSid] = new StringBuilder();
+
+                    var msg = JsonSerializer.Serialize(new
+                    {
+                        @event = "outboundCallStarted",
+                        CallSid = callSid,
+                        To = toNumber
+                    });
+
+                    await ws.SendAsync(
+                        Encoding.UTF8.GetBytes(msg),
+                        WebSocketMessageType.Text,
+                        true,
+                        CancellationToken.None);
+                }
+
                 if (actionProp.GetString() == "acceptCall")
                 {
                     var callSid = doc.RootElement.GetProperty("CallSid").GetString();
@@ -615,6 +675,18 @@ app.MapPost("/connect", (HttpRequest req) =>
         response.Append(connect);
         return Results.Text(response.ToString(), "text/xml", Encoding.UTF8);
     });
+
+app.MapPost("/outbound-connect", (HttpRequest req) =>
+{
+    var response = new VoiceResponse();
+
+    var connect = new Connect();
+    connect.Stream(url: $"wss://{req.Host}/stream");
+
+    response.Append(connect);
+
+    return Results.Text(response.ToString(), "text/xml", Encoding.UTF8);
+});
 
 // Gather DTMF input from caller
 app.MapPost("/gather", async (HttpRequest request) =>

@@ -25,7 +25,7 @@ namespace AgentView
         private bool IsVerifyingCard;
         public event EventHandler VerifyCardRequested;
         private ContactService contactService = new ContactService();
-        public OnCallControl(string callSid, string from)
+        public OnCallControl(string callSid, string from, bool startConnected = true)
         {
             CallSid = callSid;
             FromNumber = from;
@@ -35,9 +35,17 @@ namespace AgentView
             InitializeComponent();
             timer_Call.Interval = 1000;
             timer_Call.Tick += Timer_Call_Tick;
+
             label_FromNumber.Text = FromNumber;
-            stopwatch.Start();
-            timer_Call.Start();
+
+            if (startConnected)
+            {
+                StartConnectedCall();
+            }
+            else
+            {
+                SetCallingState();
+            }
         }
 
         private void Timer_Call_Tick(object sender, EventArgs e)
@@ -132,6 +140,35 @@ namespace AgentView
             IsVerifyingCard = false;
         }
 
+        public void SetCallingState()
+        {
+            timer_Call.Stop();
+            stopwatch.Reset();
+
+            label_Timer.Text = "Calling...";
+
+            btn_MuteMic.Enabled = false;
+            btn_DTMF.Enabled = false;
+            btn_Hold.Enabled = false;
+            btn_CardVerify.Enabled = false;
+            btn_AddContact.Enabled = false;
+
+            btn_EndCall.Enabled = true;
+        }
+
+        public void StartConnectedCall()
+        {
+            btn_MuteMic.Enabled = true;
+            btn_DTMF.Enabled = true;
+            btn_Hold.Enabled = true;
+            btn_CardVerify.Enabled = true;
+            btn_AddContact.Enabled = true;
+            btn_EndCall.Enabled = true;
+
+            stopwatch.Restart();
+            timer_Call.Start();
+        }
+
         private void OnCallControl_Load(object sender, EventArgs e)
         {
 
@@ -141,7 +178,7 @@ namespace AgentView
         {
             var contact = contactService.GetCreateContactByPhone(FromNumber);
 
-            using var form = new ContactForm(contact);
+            using var form = new ContactForm(contact, lockPhoneNumber: true);
 
             if (form.ShowDialog() == DialogResult.OK)
             {
