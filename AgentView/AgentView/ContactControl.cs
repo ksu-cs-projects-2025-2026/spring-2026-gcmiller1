@@ -73,6 +73,20 @@ namespace AgentView
             lb_ContactName.Text = $"{Contact.LastName}, {Contact.FirstName}";
         }
 
+        public void SetCallButtonEnabled(bool enabled)
+        {
+            btn_Call.Enabled = enabled;
+
+            if (enabled)
+            {
+                btn_Call.BackColor = Color.SpringGreen;
+            }
+            else
+            {
+                btn_Call.BackColor = SystemColors.ControlDark;
+            }
+        }
+
         private void btn_Call_Click(object sender, EventArgs e)
         {
             if (string.IsNullOrWhiteSpace(Contact.PhoneNumber))

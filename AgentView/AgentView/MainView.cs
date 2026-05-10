@@ -89,6 +89,7 @@ namespace AgentView
             comboBox1.DataSource = list;
             comboBox1.SelectedItem = AgentStatus.OnCall;
             comboBox1.Enabled = false;
+            SetContactCallButtonsEnabled(false);
         }
 
         /// <summary>
@@ -128,6 +129,7 @@ namespace AgentView
             comboBox1.DataSource = null;
             comboBox1.DataSource = list;
             comboBox1.SelectedItem = AgentStatus.Available;
+            SetContactCallButtonsEnabled(true);
         }
 
         /// <summary>
@@ -660,6 +662,8 @@ namespace AgentView
                 Dock = DockStyle.Top
             };
 
+            ctrl.SetCallButtonEnabled(activeCallControl == null);
+
             ctrl.ContactUpdated += (_, __) =>
             {
                 SaveContactsToJson();
@@ -839,6 +843,17 @@ namespace AgentView
                 SaveContactsToJson();
 
                 AddContactControlToPanel(form.Contact);
+            }
+        }
+
+        private void SetContactCallButtonsEnabled(bool enabled)
+        {
+            foreach (Control control in PanelIncomingCalls.Controls)
+            {
+                if (control is ContactControl contactControl)
+                {
+                    contactControl.SetCallButtonEnabled(enabled);
+                }
             }
         }
     }
