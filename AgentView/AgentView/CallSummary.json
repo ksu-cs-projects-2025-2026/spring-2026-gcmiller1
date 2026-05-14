@@ -75,5 +75,115 @@
     "CallLength": "00:00:28",
     "CallSentiment": 0.3141,
     "CardVerified": false
+  },
+  {
+    "Answered": true,
+    "Inbound": true,
+    "Contact": null,
+    "FromNumber": "\u002B19134333428",
+    "CallStartTime": "2026-05-13 19:33:30",
+    "CallEndTime": "2026-05-13 19:36:34",
+    "CallLength": "00:03:03",
+    "CallSentiment": -0.03906,
+    "CardVerified": true
+  },
+  {
+    "Answered": true,
+    "Inbound": false,
+    "Contact": null,
+    "FromNumber": "\u002B19134333428",
+    "CallStartTime": "2026-05-13 19:37:44",
+    "CallEndTime": "2026-05-13 19:37:53",
+    "CallLength": "00:00:08",
+    "CallSentiment": 0,
+    "CardVerified": false
+  },
+  {
+    "Answered": true,
+    "Inbound": true,
+    "Contact": null,
+    "FromNumber": "\u002B19134333428",
+    "CallStartTime": "2026-05-13 19:38:06",
+    "CallEndTime": "2026-05-13 19:38:16",
+    "CallLength": "00:00:10",
+    "CallSentiment": 0.2732,
+    "CardVerified": false
+  },
+  {
+    "Answered": true,
+    "Inbound": true,
+    "Contact": null,
+    "FromNumber": "\u002B19134333428",
+    "CallStartTime": "2026-05-13 20:40:52",
+    "CallEndTime": "2026-05-13 20:44:31",
+    "CallLength": "00:03:38",
+    "CallSentiment": 0.16798000000000002,
+    "CardVerified": true
+  },
+  {
+    "Answered": true,
+    "Inbound": false,
+    "Contact": null,
+    "FromNumber": "\u002B19134333428",
+    "CallStartTime": "2026-05-13 20:45:24",
+    "CallEndTime": "2026-05-13 20:45:33",
+    "CallLength": "00:00:09",
+    "CallSentiment": 0.28595,
+    "CardVerified": false
+  },
+  {
+    "Answered": true,
+    "Inbound": false,
+    "Contact": null,
+    "FromNumber": "\u002B19134333428",
+    "CallStartTime": "2026-05-13 20:46:13",
+    "CallEndTime": "2026-05-13 20:46:19",
+    "CallLength": "00:00:05",
+    "CallSentiment": 0,
+    "CardVerified": false
+  },
+  {
+    "Answered": false,
+    "Inbound": true,
+    "Contact": null,
+    "FromNumber": "\u002B19134333428",
+    "CallStartTime": null,
+    "CallEndTime": "2026-05-13 20:46:40",
+    "CallLength": null,
+    "CallSentiment": 0,
+    "CardVerified": false
+  },
+  {
+    "Answered": false,
+    "Inbound": false,
+    "Contact": null,
+    "FromNumber": "\u002B19134333428",
+    "CallStartTime": null,
+    "CallEndTime": "2026-05-13 20:46:53",
+    "CallLength": null,
+    "CallSentiment": 0,
+    "CardVerified": false
+  },
+  {
+    "Answered": true,
+    "Inbound": true,
+    "Contact": null,
+    "FromNumber": "\u002B19134333428",
+    "CallStartTime": "2026-05-13 21:41:19",
+    "CallEndTime": "2026-05-13 21:44:13",
+    "CallLength": "00:02:54",
+    "CallSentiment": 0.15427,
+    "CardVerified": true
+  },
+  {
+    "Answered": true,
+    "Inbound": false,
+    "Contact": null,
+    "FromNumber": "\u002B19134333428",
+    "CallStartTime": "2026-05-13 21:45:18",
+    "CallEndTime": "2026-05-13 21:45:24",
+    "CallLength": "00:00:06",
+    "CallSentiment": 0,
+    "CardVerified": false
   }
 ]

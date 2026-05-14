@@ -222,8 +222,8 @@
             // 
             // MainView
             // 
-            AutoScaleDimensions = new SizeF(7F, 15F);
-            AutoScaleMode = AutoScaleMode.Font;
+            AutoScaleDimensions = new SizeF(96F, 96F);
+            AutoScaleMode = AutoScaleMode.Dpi;
             BackColor = Color.FromArgb(242, 246, 248);
             ClientSize = new Size(893, 510);
             Controls.Add(PanelIncomingCalls);

@@ -30,6 +30,7 @@ namespace AgentView
         public event Func<string, Task> CardVerificationRequested;
         public event Func<Contact, Task> ContactCallRequested;
         public event Action<AgentStatus> StatusChanged;
+        private ContactService contactService = new ContactService();
 
         private List<Contact> loadedContacts = new();
         private readonly Dictionary<string, IncomingCallControl> incomingCallRows = new();
@@ -765,17 +766,7 @@ namespace AgentView
 
         private void SaveContactsToJson()
         {
-            var filePath = Path.Combine(
-                Directory.GetParent(AppDomain.CurrentDomain.BaseDirectory).Parent.Parent.Parent.FullName,
-                "Contacts.json"
-            );
-
-            var options = new JsonSerializerOptions
-            {
-                WriteIndented = true
-            };
-
-            File.WriteAllText(filePath, JsonSerializer.Serialize(loadedContacts, options));
+            contactService.SaveContacts(loadedContacts);
         }
 
         private void btn_History_Click(object sender, EventArgs e)
