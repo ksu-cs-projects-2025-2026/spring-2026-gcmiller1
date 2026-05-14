@@ -7,5 +7,7 @@ Set these environment variables:
 	- TWILIO_ACCOUNT_SID
 	- TWILIO_AUTH_TOKEN
 	- TWILIO_PHONE_NUMBER
+- Download the vosk-model-small-en-us-0.15 folder and place it in a folder "model" in the IVRSystem folder.
+	- Download link: https://alphacephei.com/vosk/models
 - Twilio webhooks must point to the deployed server
 - Run server, then run app
